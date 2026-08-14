@@ -4,10 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-A content repository, not an application: six Claude Code skills for indie game development
-(Godot 4 UI, itch.io publishing, Kenney assets, seeded game design), packaged as one installable
-plugin. There is nothing to build, no dependency manifest, and no test runner. The deliverable is
-Markdown plus a handful of standalone scripts.
+A content repository, not an application: eight Claude Code skills for indie game development
+(Godot 4 UI, itch.io publishing, Kenney assets, Blender asset authoring, seeded game design, and a
+self-improvement loop), packaged as one installable plugin. There is nothing to build, no dependency
+manifest, and no test runner. The deliverable is Markdown plus a handful of standalone scripts.
 
 ## Commands
 
@@ -16,6 +16,7 @@ The scripts are the only executable surface. All are stdlib-only except `store_a
 ```bash
 python skills/game-from-gibberish/scripts/seed.py --seed 41521    # deterministic; use to verify axes.md edits
 python skills/kenney-asset-kit/scripts/kenney_probe.py "<kit dir>" [--json]
+python skills/blender-mcp-modelling/scripts/style_probe.py "<ref dir>" [--check FILE] [--json]
 python skills/godot-game-ui/scripts/scaffold_ui.py <godot project> [--only theme,hud] [--dest ui] [--force]
 python skills/godot-game-ui-juicy/scripts/scaffold_juicy_ui.py <godot project>
 python skills/itch-store-page/scripts/store_art.py palette|cover|banner --src shot.png
@@ -69,6 +70,22 @@ subdirectories are pulled in only when needed:
 `pause_menu.gd`, `title_screen.gd` and `results_screen.gd` have diverged (juicy is the animated
 superset, and adds `ui_juice.gd`). There is no shared source — a fix to a shared file must be
 applied to both copies, and the two scaffolders' `PIECES` dependency tables kept parallel.
+
+**`blender-mcp-modelling` pairs with `kenney-asset-kit`** — the same measurement idea pointed the
+other way. `kenney_probe.py` measures a kit so you can *place* models from it; `style_probe.py`
+measures a reference set so you can *author* a new model into it, and its `--check` mode re-derives
+that contract to gate an export (exit 1 on a mismatch). `--check` deliberately excludes the
+candidate from the reference scan: a new asset sitting in the kit folder would otherwise help
+define the contract it is being judged against.
+
+Its `assets/bmcp_helpers.py` breaks the `assets/` convention below and the deviation is the point:
+it is never copied into a project. Blender reads it **off disk itself** via
+`importlib.util.spec_from_file_location` and keeps it in `sys.modules`, because each
+`execute_blender_code` call gets a fresh namespace while `sys.modules` and the `bpy` scene persist.
+That keeps the helper source out of the conversation entirely. It imports `bpy`/`bmesh`/`mathutils`
+at module level, so it cannot be imported outside Blender — to syntax-check it here, stub those
+three modules in `sys.modules` first, which is enough to exercise the pure functions
+(`palette_from_dir`, `box`, `taper_box`).
 
 **`seed.py` is driven by `references/axes.md`.** The script parses that Markdown at runtime: every
 `- ` bullet under a `## <axis>` heading is one draw candidate, prose between headings is ignored,
