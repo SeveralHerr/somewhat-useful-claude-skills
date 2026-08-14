@@ -30,6 +30,7 @@ For local development against a checkout instead of GitHub, point the marketplac
 | `itch-store-page` | Sets up or updates an itch.io game page (theme colours, tagline, tags, cover, banner, screenshots) by driving your logged-in Chrome, and generates store art and a palette from gameplay screenshots. |
 | `itch-devlog` | Writes and files a short end-of-day devlog as an itch.io draft — pulls the day's work from git, translates it into player-facing bullets, and grabs a fresh screenshot from the running game. |
 | `kenney-asset-kit` | Measures a Kenney kit's real grid unit, pivot convention, model facing and module widths straight out of the glTF instead of guessing, and gives a bounding-box-anchored placement pattern (Godot 4 helper included). |
+| `game-from-gibberish` | Turns keyboard mash — or a blank page — into a real small game. Rolls the design constraints on dice before any thinking happens, so the randomness actually steers instead of collapsing back into an endless runner. |
 
 Skills load themselves when they're relevant — you generally don't need to invoke them by name.
 Each one's `description` in its `SKILL.md` frontmatter is what Claude matches against.
@@ -54,3 +55,7 @@ skills/
   ever want one, install and ignore the other; they don't conflict.
 - `itch-store-page` and `itch-devlog` both drive a real logged-in Chrome session via the Claude in
   Chrome extension. They don't use the itch.io API, because it can't touch page presentation.
+- `game-from-gibberish` hands the actual building off to the Godot UI skills above and to the
+  `godot-selftest-harness` plugin; on its own it only produces the brief. Its wordlists live in
+  `references/axes.md` and are meant to be edited —
+  that file, not the script, is what decides how strange the results get.
