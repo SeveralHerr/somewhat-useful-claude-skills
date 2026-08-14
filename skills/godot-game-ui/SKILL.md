@@ -273,14 +273,14 @@ they are commented with the reasoning, not just the what.
 This kit is used far more often than it is edited, so its defects are found here, in a game
 project, and lost here too. If using it cost retries — a path in these instructions that did
 not resolve, a step it failed to mention, an assertion in the templates it contradicts, a
-Godot behaviour it should have warned about — hand that to **`skill-feedback-pr`**, which
-opens a pull request against this repo with the fix and the evidence.
+Godot behaviour it should have warned about — hand that to **`skill-feedback-issue`**,
+which files it against this repo with the evidence and the pinned version it broke in.
 
-Two conditions, and they are the same ones that skill enforces: the problem has to have
-actually bitten during this session, and the fix has to be writable as a diff. "The nine
-ideas section is long" is not a PR. "`scaffold_ui.py` at the path this file gives does not
-exist under a plugin install" is.
+Two conditions, and they are the same ones that skill enforces: it has to have actually
+gone wrong, and you have to be able to say what should change. "The nine ideas section is
+long" is not an issue. "`scaffold_ui.py` at the path this file gives does not exist under a
+plugin install" is.
 
-If `skill-feedback-pr` is not installed, say what the fix would be and let the user decide
-where it goes — do not edit the plugin cache, since the next `/plugin update` overwrites it
-and the fix disappears without ever reaching the repo.
+If `skill-feedback-issue` is not installed, say what the fix would be and let the user
+decide where it goes — do not edit the plugin cache, since the next `/plugin update`
+overwrites it and the fix disappears without ever reaching the repo.
