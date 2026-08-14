@@ -7,7 +7,7 @@
     {
       "name": "somewhat-useful-claude-skills",
       "source": "./",
-      "description": "A personal collection of Claude Code skills for indie game development: Godot 4 in-game UI (static and animated), itch.io store pages and devlogs, Kenney asset kit conventions, and a seeded method for generating games out of keyboard mash.",
+      "description": "A personal collection of Claude Code skills for indie game development: Godot 4 in-game UI (static and animated), itch.io store pages and devlogs, Kenney asset kit conventions, a seeded method for generating games out of keyboard mash, and a feedback loop that sends each skill's own defects back as a pull request.",
       "keywords": [
         "godot",
         "gamedev",
@@ -17,7 +17,9 @@
         "assets",
         "devlog",
         "game-design",
-        "procedural"
+        "procedural",
+        "feedback",
+        "pull-request"
       ]
     }
   ]
