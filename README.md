@@ -1,0 +1,56 @@
+# somewhat-useful-claude-skills
+
+A personal collection of [Claude Code](https://claude.com/claude-code) skills for indie game
+development, packaged as a plugin so they follow me between machines.
+
+Everything here is aimed at the same workflow: building small games in **Godot 4**, dressing them
+in **Kenney** art, and shipping them to **itch.io**.
+
+## Install
+
+```
+/plugin marketplace add SeveralHerr/somewhat-useful-claude-skills
+/plugin install somewhat-useful-claude-skills
+```
+
+To update later, `/plugin marketplace update somewhat-useful-claude-skills`.
+
+For local development against a checkout instead of GitHub, point the marketplace at the directory:
+
+```
+/plugin marketplace add /path/to/somewhat-useful-claude-skills
+```
+
+## What's in here
+
+| Skill | What it does |
+| --- | --- |
+| `godot-game-ui` | Builds polished in-game UI for Godot 4 — HUDs, pause menus, title screens, results screens, counters, prompts. Ships a Python scaffolder that installs a working, re-skinnable UI kit into any Godot project. |
+| `godot-game-ui-juicy` | Everything `godot-game-ui` ships, plus a full motion layer: overshoot entrances, staggered rows, punching counters, shake and screen flash — with a global switch to turn it all off. |
+| `itch-store-page` | Sets up or updates an itch.io game page (theme colours, tagline, tags, cover, banner, screenshots) by driving your logged-in Chrome, and generates store art and a palette from gameplay screenshots. |
+| `itch-devlog` | Writes and files a short end-of-day devlog as an itch.io draft — pulls the day's work from git, translates it into player-facing bullets, and grabs a fresh screenshot from the running game. |
+| `kenney-asset-kit` | Measures a Kenney kit's real grid unit, pivot convention, model facing and module widths straight out of the glTF instead of guessing, and gives a bounding-box-anchored placement pattern (Godot 4 helper included). |
+
+Skills load themselves when they're relevant — you generally don't need to invoke them by name.
+Each one's `description` in its `SKILL.md` frontmatter is what Claude matches against.
+
+## Layout
+
+```
+.claude-plugin/
+  marketplace.json   # makes this repo an installable marketplace
+  plugin.json        # the single plugin, which bundles every skill
+skills/
+  <skill-name>/
+    SKILL.md         # frontmatter (name, description) + instructions
+    scripts/         # optional executables the skill calls
+    assets/          # optional templates the skill copies into a project
+    references/      # optional docs the skill reads on demand
+```
+
+## Notes
+
+- The two Godot UI skills overlap heavily by design — `-juicy` is the animated superset. If you only
+  ever want one, install and ignore the other; they don't conflict.
+- `itch-store-page` and `itch-devlog` both drive a real logged-in Chrome session via the Claude in
+  Chrome extension. They don't use the itch.io API, because it can't touch page presentation.

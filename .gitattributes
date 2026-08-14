@@ -1,0 +1,9 @@
+# Normalize line endings so skills behave identically on every machine.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.gif binary
+*.glb binary
+*.ogg binary
+*.wav binary

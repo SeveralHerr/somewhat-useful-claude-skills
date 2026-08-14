@@ -1,0 +1,22 @@
+{
+  "name": "somewhat-useful-claude-skills",
+  "owner": {
+    "name": "jherr"
+  },
+  "plugins": [
+    {
+      "name": "somewhat-useful-claude-skills",
+      "source": "./",
+      "description": "A personal collection of Claude Code skills for indie game development: Godot 4 in-game UI (static and animated), itch.io store pages and devlogs, and Kenney asset kit conventions.",
+      "keywords": [
+        "godot",
+        "gamedev",
+        "ui",
+        "itch.io",
+        "kenney",
+        "assets",
+        "devlog"
+      ]
+    }
+  ]
+}

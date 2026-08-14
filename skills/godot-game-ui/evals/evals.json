@@ -1,0 +1,47 @@
+{
+  "skill_name": "godot-game-ui",
+  "evals": [
+    {
+      "id": 0,
+      "name": "survival-hud-and-pause",
+      "prompt": "I'm making a top-down survival shooter in Godot 4. I need a HUD that shows health, ammo and the current wave number, and a pause menu with a volume slider. Right now there's no UI at all. Can you build it?",
+      "expected_output": "Working .gd files in the project that compile under Godot 4, giving a HUD with three readouts and a functioning pause menu.",
+      "assertions": [
+        "The project compiles under Godot 4.7: an --import pass produces no SCRIPT ERROR, Parse Error, Failed to load script or Compilation failed.",
+        "The HUD shows all three requested readouts: health, ammo, and wave number.",
+        "A pause menu exists and contains a volume slider.",
+        "Every node in the pause overlay sets process_mode to PROCESS_MODE_ALWAYS, so its buttons still respond while get_tree().paused is true.",
+        "HUD text is given BOTH a font outline and a drop shadow, so it stays readable over arbitrary gameplay.",
+        "The UI requires no image or font asset files (no .png/.svg/.ttf referenced or needed)."
+      ]
+    },
+    {
+      "id": 1,
+      "name": "reskin-programmer-art",
+      "prompt": "My Godot 4 roguelike's UI is embarrassing - it's just plain white Labels sitting on default grey Panels, no styling at all. I want it to actually look designed. The game is dark fantasy, lots of deep purples and bone white. Can you sort out the look of the HUD?",
+      "expected_output": "A themed UI with a coherent dark-fantasy palette, styled panels and readable text over gameplay.",
+      "assertions": [
+        "The project compiles under Godot 4.7: an --import pass produces no SCRIPT ERROR, Parse Error, Failed to load script or Compilation failed.",
+        "Colours are defined once in a single central theme/palette location rather than scattered as literals across screen scripts.",
+        "The palette matches the brief: deep purples and a bone-white text colour.",
+        "Panels use StyleBoxFlat with corner radii and borders rather than Godot's default grey Panel styling.",
+        "HUD text is given BOTH a font outline and a drop shadow, so it stays readable over arbitrary gameplay.",
+        "The UI requires no image or font asset files (no .png/.svg/.ttf referenced or needed)."
+      ]
+    },
+    {
+      "id": 2,
+      "name": "results-screen-collection",
+      "prompt": "Add a level-complete screen to my Godot 4 puzzle game. It should show the time taken and the number of moves used, and also a grid of all 30 collectible stamps in the game with the ones the player has found highlighted and the rest greyed out.",
+      "expected_output": "A results screen script showing stat readouts plus a collection grid where unfound entries remain visible but blanked.",
+      "assertions": [
+        "The project compiles under Godot 4.7: an --import pass produces no SCRIPT ERROR, Parse Error, Failed to load script or Compilation failed.",
+        "The screen displays both the time taken and the number of moves used.",
+        "The collection grid contains all 30 stamp entries, not only the found ones.",
+        "Unfound stamps remain visible as blanked/greyed cells rather than being omitted from the grid.",
+        "The screen is driven by data passed in (a present()-style call or exported arrays) rather than 30 hard-coded nodes.",
+        "The UI requires no image or font asset files (no .png/.svg/.ttf referenced or needed)."
+      ]
+    }
+  ]
+}
