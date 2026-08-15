@@ -21,6 +21,19 @@ from pathlib import Path
 
 DEFAULT_AXES = Path(__file__).resolve().parent.parent / "references" / "axes.md"
 
+# The casting is printed for a human to paste into SEED.md, but it is just as often read
+# through a pipe, a redirect, or an agent capturing stdout — all of which expect UTF-8. On
+# a Windows console Python would otherwise encode to the active codepage, so an em dash
+# lands as the single byte 0x97 and every UTF-8 consumer downstream sees a corrupted
+# character in the artefact the whole method is built on. Pinning the encoding here rather
+# than spelling the dashes in ASCII is deliberate: most of what gets printed comes out of
+# references/axes.md, which is prose this script does not control and cannot keep ASCII.
+# errors="replace" keeps the other half of the promise — a console that genuinely cannot
+# render a character degrades it to "?" instead of raising UnicodeEncodeError mid-casting.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+
 # The physical layout is what makes a generated mash look like a real one: a paw lands
 # somewhere and smears, so the string carries runs and neighbours rather than the flat
 # uniform noise you get from random.choice over the alphabet.
