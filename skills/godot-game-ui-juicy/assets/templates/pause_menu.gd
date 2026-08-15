@@ -44,6 +44,17 @@ signal volume_changed(value: float)
 
 @export var title_text: String = "Paused"
 @export var subtitle_text: String = ""
+
+## One caption per button, named after the signal it emits rather than after the default text.
+## Changing what a button SAYS and changing what it MEANS are separate edits — that is already
+## why the signals are named the way they are above, and a frozen caption is the same coupling
+## from the other side. Defaults are the previous hard-coded strings, so existing scenes are
+## unaffected. Note that menu_label captions menu_requested ("leave the run") and quit_label
+## captions quit_requested ("leave the game"); see the signal comments before swapping them.
+@export var resume_label: String = "Resume"
+@export var restart_label: String = "Restart"
+@export var menu_label: String = "Quit to menu"
+@export var quit_label: String = "Quit to desktop"
 @export var show_restart: bool = true
 ## Off by default: in most games the pause menu returns you to a title screen that has its own
 ## Quit, and two adjacent buttons whose labels both start with "Quit" is how a player loses a
@@ -115,12 +126,12 @@ func _build() -> void:
 	_volume = _slider(col, "Volume", 0.0, 1.0, 0.8, volume_changed)
 	col.add_child(_gap(18.0))
 
-	col.add_child(_button("Resume", resume_requested, true))
+	col.add_child(_button(resume_label, resume_requested, true))
 	if show_restart:
-		col.add_child(_button("Restart", restart_requested, false))
-	col.add_child(_button("Quit to menu", menu_requested, false))
+		col.add_child(_button(restart_label, restart_requested, false))
+	col.add_child(_button(menu_label, menu_requested, false))
 	if show_quit_to_desktop:
-		col.add_child(_button("Quit to desktop", quit_requested, false))
+		col.add_child(_button(quit_label, quit_requested, false))
 
 	# The panel grows in as one object; its rows then arrive in sequence just behind it. The
 	# small head start on the stagger is what makes it read as "the panel brought them" rather

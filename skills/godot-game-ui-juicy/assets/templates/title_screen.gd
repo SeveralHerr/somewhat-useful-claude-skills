@@ -13,7 +13,12 @@ signal quit_requested()
 
 @export var title: String = "GAME TITLE"
 @export_multiline var taglines: PackedStringArray = PackedStringArray(["A game about something."])
+## Captions are exported, one per button, named after the signal the button emits rather than
+## after the default caption — the same separation the signal names already make. A game with a
+## voice ("Begin shift", "Clock out") should not have to fork this file to say so, and a
+## localised one cannot use a caption that only exists as a literal in here.
 @export var play_label: String = "Play"
+@export var quit_label: String = "Quit"
 @export var controls_hint: String = ""
 
 var _title_label: Label = null
@@ -60,7 +65,7 @@ func _build() -> void:
 
 	col.add_child(_gap(34.0))
 	col.add_child(_button(play_label, play_requested, true))
-	col.add_child(_button("Quit", quit_requested, false))
+	col.add_child(_button(quit_label, quit_requested, false))
 
 	if not controls_hint.is_empty():
 		col.add_child(_gap(26.0))

@@ -18,6 +18,13 @@ const COLUMNS: int = 15
 
 @export var heading: String = "Run Complete"
 
+## One caption per button, named after the signal it emits rather than after the default text.
+## The heading above was already configurable while the buttons were not, which meant a game
+## with any voice of its own had to fork this file to stop saying "Play again" — and put its
+## button text somewhere localisation could never reach.
+@export var again_label: String = "Play again"
+@export var menu_label: String = "Main menu"
+
 var _stats: Dictionary = {}
 var _entries: Array[Dictionary] = []
 var _verdict: String = ""
@@ -97,8 +104,8 @@ func _build() -> void:
 	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
 	buttons.add_theme_constant_override("separation", 16)
 	col.add_child(buttons)
-	buttons.add_child(_button("Play again", again_requested, true))
-	buttons.add_child(_button("Main menu", menu_requested, false))
+	buttons.add_child(_button(again_label, again_requested, true))
+	buttons.add_child(_button(menu_label, menu_requested, false))
 
 	# Sections arrive top to bottom, and the collection chips ripple in behind them. The grid
 	# is the reason a results screen is worth animating at all: a wave across the chips makes

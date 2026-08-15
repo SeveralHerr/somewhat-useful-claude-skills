@@ -271,6 +271,17 @@ menu's "Quit to menu" wired to `quit_requested`, an integrator wired that to
 is documentation that the compiler will not check, so the two screens offering the same
 choice must agree on it.
 
+**The caption is the other half of that, and it belongs in an export.** If a button's text
+and its meaning are separate concerns, then freezing the text into the template couples them
+straight back together — from the other side. Every shell-screen button takes its caption
+from an `@export` named after the signal it emits (`again_label`, `menu_label`,
+`resume_label`, `quit_label`), defaulting to the generic wording. A game with a voice of its
+own says "Clock out" instead of "Quit to menu" by setting a property, and a localised game
+has somewhere to put the translated string other than a literal inside a script it forked.
+This kit shipped with `ResultsScreen.heading` configurable while the two buttons underneath
+it were not, which is how you end up with a deadpan-clinical end screen politely offering
+"Play again".
+
 **Set `pivot_offset` from the current size on every punch**, not once at `_ready`. A Control
 inside a container is resized after `_ready`, and a stale pivot makes the scale visibly
 swing from a corner.
