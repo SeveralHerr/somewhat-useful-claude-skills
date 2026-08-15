@@ -171,7 +171,11 @@ Tuning the skill's output means editing the wordlists, not the script.
 - The Godot kit is deliberately asset-free: no `.png`, `.ttf`, `.tres` or `.tscn` — colours come
   from one theme file and icons are drawn in `_draw()`. Eval assertions enforce this.
 - `.gitattributes` forces LF; keep scripts POSIX-shebanged and path-agnostic (they run on Windows
-  here but are meant to travel).
+  here but are meant to travel). Patching a file from a throwaway Python script needs
+  `write_bytes` or `newline="\n"` — `write_text` emits CRLF on Windows, git normalises it on
+  checkin so it never appears in a diff, and the working copy is left disagreeing with the repo.
+  That matters here because two byte-identity assertions between the UI skills compare files
+  directly and will report a difference that `git diff` denies.
 
 
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:6cd5cc61 -->
