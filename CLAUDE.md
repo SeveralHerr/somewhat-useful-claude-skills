@@ -35,6 +35,21 @@ godot --headless --path /tmp/probe-project --script res://smoke_test.gd   # prin
 `godot-game-ui-juicy` additionally ships `assets/juice_test.gd`, run the same way. Skipping the
 `--import` pass is the usual cause of a parse-error cascade in files nobody touched.
 
+`godot-2d-placement-audit` is checked the same way and needs no scaffolder — copy both files into
+any Godot 4 project and run the test, which prints `SMOKE: ALL PASS` and exits 0:
+
+```bash
+cp skills/godot-2d-placement-audit/scripts/placement_audit_2d.gd /tmp/probe-project/
+cp skills/godot-2d-placement-audit/assets/smoke_test.gd /tmp/probe-project/
+godot --headless --path /tmp/probe-project --import
+godot --headless --path /tmp/probe-project --script res://smoke_test.gd
+```
+
+Read stderr on that run, not just the exit code. GDScript's `%` operator supports fewer specifiers
+than C's — `%g` is not among them — and an unsupported one yields an empty string plus a stderr
+line rather than an error, so a check keeps "passing" while reporting nothing. The smoke test
+asserts every message is non-empty for that reason.
+
 `skills/godot-game-ui/evals/evals.json` is a `skill-creator` eval set (`skill_name` + `evals[]`
 of `prompt` / `expected_output` / `assertions`); run it through the `skill-creator` skill. It is
 the only skill with evals — new eval sets should follow that file's shape.
