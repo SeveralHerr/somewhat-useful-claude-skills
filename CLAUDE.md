@@ -20,6 +20,7 @@ python skills/kenney-asset-kit/scripts/kenney_probe2d.py "<2D pack dir>" [--chec
 python skills/blender-mcp-modelling/scripts/style_probe.py "<ref dir>" [--check FILE] [--json]
 python skills/godot-game-ui/scripts/scaffold_ui.py <godot project> [--only theme,hud] [--dest ui] [--force]
 python skills/godot-game-ui/scripts/palette_lint.py [<dir with ui_theme.gd>] [--json]   # default: the templates
+python skills/skill-feedback-issue/scripts/resolve_skill.py <skill> [--ran-from <dir>] [--json]
 python skills/godot-game-ui-juicy/scripts/scaffold_juicy_ui.py <godot project>
 python skills/itch-store-page/scripts/store_art.py palette|cover|banner --src shot.png
 ```
@@ -130,6 +131,19 @@ That keeps the helper source out of the conversation entirely. It imports `bpy`/
 at module level, so it cannot be imported outside Blender — to syntax-check it here, stub those
 three modules in `sys.modules` first, which is enough to exercise the pure functions
 (`palette_from_dir`, `box`, `taper_box`).
+
+**`resolve_skill.py` is the fourth of the measurement family**, pointed at the install rather
+than at any asset. `skill-feedback-issue` used to ask the reader to hand-cross-reference
+`installed_plugins.json` and `known_marketplaces.json`, which produced the slug fine and hid
+the harder question: the cache keeps *every version ever installed* side by side, and the tree
+a skill loads from is not guaranteed to be the one `installPath` names. That is a latent trap
+in every skill and the front door in this one, whose whole premise is that stale installs
+cause false alarms. `--ran-from` settles it by comparing the skill's own files between the two
+trees — plugin versions nearly always differ somewhere, so the only useful question is whether
+they differ *in the skill being reported on*. Note that it looks for both layouts a skill can
+ship in, `skills/<name>/` and `commands/<name>.md`; a plugin installed on this machine uses
+the second, and checking only the first reports "no plugin carries this skill" for one that
+plainly ran.
 
 **`seed.py` is driven by `references/axes.md`.** The script parses that Markdown at runtime: every
 `- ` bullet under a `## <axis>` heading is one draw candidate, prose between headings is ignored,

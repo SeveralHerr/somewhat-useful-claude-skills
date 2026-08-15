@@ -39,28 +39,63 @@ Ideas for skills that do not exist, taste, and preferences are not issues agains
 If the user keeps a suggestions log (usually a path named in a `CLAUDE.md`), those go
 there — as does a copy of anything filed, since the log is the running record.
 
-## 1. Resolve the skill to a repo
+## 1. Resolve the skill to a repo, and to the tree that actually ran
 
-Only the `owner/name` slug is needed, and two files under `~/.claude/plugins/` produce it.
-`installed_plugins.json` maps plugin → marketplace, install path and pinned sha;
-`known_marketplaces.json` maps marketplace → source:
+Run this first. It answers both questions and will not let the second one go unasked:
+
+```bash
+python <skill dir>/scripts/resolve_skill.py <skill> --ran-from "<the base directory the harness announced>"
+```
+
+It prints the `owner/name` slug to file against, the version and sha to stamp on the report,
+every version sitting in the cache, and whether the tree that ran is the tree
+`installed_plugins.json` records.
+
+The slug comes from two files under `~/.claude/plugins/`. `installed_plugins.json` maps
+plugin → marketplace, install path and pinned sha; `known_marketplaces.json` maps
+marketplace → source:
 
 - `"source": "github"` — `repo` is the slug. Done; no clone required.
-- `"source": "directory"` — read the slug from that directory's `origin`
+- `"source": "directory"` — the slug is that directory's `origin`
   (`git -C <path> remote get-url origin`). A local-only marketplace with no remote has
   nowhere to file; say so and write the note instead.
 
 Skills installed loose under `~/.claude/skills/` have no repo behind them. Offer to edit
 those in place instead of filing anything.
 
-**Then re-verify each finding against the version that is installed now.** Findings usually
-arrive from an earlier session, and the install may have moved since — a defect fixed
-between versions is the most common wasted issue in this loop. Open the skill's own source
-at the resolved `installPath`, confirm each claim at a line number, and say in the
-Environment line which ones were re-checked. Withdraw the ones that no longer reproduce; it
-is normal for one of four to go. This step is also where near-miss claims get corrected —
-"the counter never punches" turned out to be a different function from the one that refuses,
-and the issue was better for reporting the contradiction rather than the guess.
+**`installPath` is not necessarily the directory the skill ran from, and that distinction is
+this skill's entire subject matter.** The cache keeps every version ever installed side by
+side — `…/cache/<marketplace>/<plugin>/<version>/` — and a session can be loaded from an
+older tree while `installed_plugins.json` already records a newer one. Eight versions of one
+plugin and nine of another were sitting in this machine's cache when that was last checked.
+When the harness announces a base directory, take the version out of *that* path and pass it
+as `--ran-from`. If the two disagree, verify against the one that ran and name both in the
+Environment line: a line number confirmed in a tree that did not execute is precisely the
+false alarm the next paragraph exists to prevent, arriving through the front door. The script
+settles it by comparing the skill's own files between the two trees — two versions of a
+plugin nearly always differ somewhere, and the only question that matters is whether they
+differ *here*.
+
+**Then re-verify each finding against the version that ran.** Findings usually arrive from
+an earlier session, and the install may have moved since — a defect fixed between versions is
+the most common wasted issue in this loop. Open the skill's own source, confirm each claim at
+a line number, and say in the Environment line which ones were re-checked. Withdraw the ones
+that no longer reproduce; it is normal for one of four to go. This step is also where
+near-miss claims get corrected — "the counter never punches" turned out to be a different
+function from the one that refuses, and the issue was better for reporting the contradiction
+rather than the guess.
+
+**While you have the source open, find the place the repo already applies your proposed rule
+somewhere else, and cite it.** This is the step's larger payoff and it is easy to miss,
+because the step is framed as a defence. Conventions get stated once and then not carried
+across: the principle your fix depends on is usually already written down in the target repo,
+argued better than you would argue it, and applied to a neighbouring case. A report that
+quotes the maintainer's own words back at them, from their own file at a line number, gets
+acted on where an outsider's reasoning gets debated. On the run that prompted this paragraph,
+two such passages turned up — one in the target's `REFERENCE.md`, one in a linter's own
+comments — and both went to the top of the issue. In this repo the same thing happened in
+reverse: a screen script carried a comment explaining that ink must be derived from its fill,
+while the screen one file over hard-coded exactly that ink.
 
 ## 2. Check for a duplicate first
 
@@ -110,6 +145,11 @@ by reading it.
 Name the pinned version and sha every time. Feedback from a stale install is the most
 common false alarm in this loop, and that line is what lets the reader tell "already fixed
 on main" from "still broken" without re-reading the skill.
+
+When step 1 found a disagreement, that line carries **both** versions and says which one the
+claims were checked against — `@0.9.0 (<sha>) per installed_plugins.json; executed from the
+0.6.0 cache directory, which is where the line numbers below were confirmed`. A maintainer
+who cannot tell those apart has to re-derive the whole report before trusting any of it.
 
 Quote what you actually saw. A paraphrased error is a search term that will never match.
 
