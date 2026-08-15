@@ -66,7 +66,7 @@ func _build() -> void:
 	# Cleared here as well as in _collection(): a rebuild with no entries would otherwise
 	# leave freed chips in the list for the next stagger to walk over.
 	_chips.clear()
-	add_child(UiTheme.backdrop(Color(0.06, 0.05, 0.07, 1.0)))
+	add_child(UiTheme.backdrop(UiTheme.BACKDROP_OPAQUE))
 
 	var margin: MarginContainer = MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -193,7 +193,7 @@ func _chip(e: Dictionary) -> Control:
 		box.set_border_width_all(3)
 		box.border_color = e.get("tint", UiTheme.ACCENT) as Color
 	else:
-		box.bg_color = Color(0.16, 0.15, 0.17)
+		box.bg_color = UiTheme.SLOT_EMPTY
 		box.set_border_width_all(1)
 		box.border_color = UiTheme.PANEL_BORDER
 	chip.add_theme_stylebox_override("panel", box)

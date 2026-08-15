@@ -680,8 +680,8 @@ func _build_centre() -> void:
 	_key_chip.add_theme_stylebox_override("panel", UiTheme.key_chip_box())
 	row.add_child(_key_chip)
 
-	_key_label = UiTheme.make_label("E", UiTheme.FS_SMALL, Color(0.08, 0.07, 0.06), true)
-	UiTheme.style_label(_key_label, UiTheme.FS_SMALL, Color(0.08, 0.07, 0.06), false)
+	_key_label = UiTheme.make_label("E", UiTheme.FS_SMALL, UiTheme.CHIP_INK, true)
+	UiTheme.style_label(_key_label, UiTheme.FS_SMALL, UiTheme.CHIP_INK, false)
 	_key_chip.add_child(_key_label)
 
 	_prompt_label = UiTheme.make_label("", UiTheme.FS_BODY, UiTheme.TEXT, false)

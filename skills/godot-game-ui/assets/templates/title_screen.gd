@@ -35,7 +35,7 @@ func _fit() -> void:
 
 
 func _build() -> void:
-	add_child(UiTheme.backdrop(Color(0.06, 0.05, 0.07, 1.0)))
+	add_child(UiTheme.backdrop(UiTheme.BACKDROP_OPAQUE))
 
 	var center: CenterContainer = CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)

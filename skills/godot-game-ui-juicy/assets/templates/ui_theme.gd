@@ -33,8 +33,23 @@ const PANEL_FILL_DEEP: Color = Color(0.06, 0.05, 0.07, 0.88)
 const PANEL_BORDER: Color = Color(1.0, 0.93, 0.84, 0.11)
 const BACKDROP: Color = Color(0.06, 0.05, 0.07, 0.86)
 
+## The same backdrop with the game behind it hidden entirely, for screens that replace the
+## game rather than suspend it — a title screen and a results screen have nothing worth
+## showing through. Derived from BACKDROP rather than written out again so a re-skin moves
+## both: four screens used to carry their own opaque copy of this colour, which survived a
+## palette change and rendered the old hue against an otherwise re-skinned UI.
+const BACKDROP_OPAQUE: Color = Color(BACKDROP, 1.0)
+
 ## High-contrast light chip, for keycaps and anything that must read as physical.
 const CHIP_FILL: Color = Color(0.93, 0.90, 0.86, 0.92)
+
+## What is printed ON the chip. Kept next to CHIP_FILL because the two are a contrast pair:
+## re-skin the fill dark and this has to move with it or the keycap glyph disappears.
+const CHIP_INK: Color = Color(0.08, 0.07, 0.06)
+
+## A collection slot whose item has not been found. Distinct from PANEL_FILL: it has to read
+## as an empty socket sitting on a panel, so it cannot be the same value as the panel itself.
+const SLOT_EMPTY: Color = Color(0.16, 0.15, 0.17)
 
 const GOOD: Color = Color(0.44, 0.83, 0.45)
 const BAD: Color = Color(0.96, 0.36, 0.33)
