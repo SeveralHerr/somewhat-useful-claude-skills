@@ -1,6 +1,6 @@
 ---
 name: kenney-asset-kit
-description: Work with Kenney asset packs (kenney.nl) - the modular 3D kits, 2D tilesheets, UI packs and audio. Measures a kit's real grid unit, pivot convention, model facing and module widths straight out of the glTF instead of guessing at them, and gives a bounding-box-anchored placement pattern (Godot 4 helper included). Use this whenever the user mentions Kenney, or names an asset kit (Furniture Kit, Nature Kit, City Kit, Space Kit, Castle Kit, Modular Dungeon, Tower Defense Kit...), or is assembling a level, room, house, dungeon or town out of prefab 3D models, or is snapping models to a grid - and especially at the symptoms of guessed conventions: furniture facing into walls, tiles that will not line up, models floating or sunk into the floor, pieces overlapping, "which way does this model face". Also covers Kenney 2D tilesheets, sprite atlases and UI packs.
+description: Work with Kenney asset packs (kenney.nl) - the modular 3D kits, 2D tilesheets, UI packs and audio. Measures a kit's real grid unit, pivot convention, model facing and module widths straight out of the glTF instead of guessing at them, and gives a bounding-box-anchored placement pattern (Godot 4 helper included). Use this whenever the user mentions Kenney, or names an asset kit (Furniture Kit, Nature Kit, City Kit, Space Kit, Castle Kit, Modular Dungeon, Tower Defense Kit...), or is assembling a level, room, house, dungeon or town out of prefab 3D models, or is snapping models to a grid - and especially at the symptoms of guessed conventions: furniture facing into walls, tiles that will not line up, models floating or sunk into the floor, pieces overlapping, "which way does this model face". Also covers Kenney 2D tilesheets, sprite atlases and UI packs, and measures a 2D pack the same way for authoring INTO it - canvas size, retina ratio, content box and palette - so use it when the user is drawing a new sprite, tile or icon that has to sit alongside an existing 2D pack without looking foreign, or asks "what size should this sprite be", "what colours does this pack use", "does my sprite match", "my new tile looks off next to the others", "why is my art blurry/jagged in Godot".
 ---
 
 # Kenney asset kits
@@ -14,6 +14,11 @@ So the rule is: **measure the kit you are actually using.** A convention carried
 over from the last kit produces a scene that renders plausibly and is wrong
 everywhere — furniture backed into walls, tiles half a unit off — and you will
 spend longer un-guessing it than measuring would have taken.
+
+There are two probes, one per dimension. **3D kit → `kenney_probe.py`** (sections
+1–5 below). **2D pack → `kenney_probe2d.py`** (the 2D section at the end). Both
+measure rather than guess, both have a `--check` arm for authoring a new asset
+into the set, and neither convention transfers to the other.
 
 ## 1. Probe the kit
 
@@ -117,7 +122,10 @@ found five bugs no screenshot showed: a lamp measuring 7 units across, a rug
 crossing two walls, a fridge 0.09 wider than the run it sat in, opaque
 auto-generated node names, and an entire kit rotated backwards.
 
-## 5. Adding a model to a kit
+## 5. Adding a model to a kit (3D)
+
+For the 2D counterpart — authoring a sprite into a 2D pack — see **Adding a
+sprite to a 2D pack** at the end. The two share the idea and share no numbers.
 
 The mirror image of everything above, and the place users go the moment a kit
 runs out of pieces. Conformance is a **numeric contract**, not a matter of taste,
@@ -185,7 +193,14 @@ treatment. Check which one you have before writing any region maths.
   PNGs directly and the atlas region maths disappears entirely.
 - `Spritesheet/*.png` + `*.xml` — a `<TextureAtlas>` of named `<SubTexture>`
   rects. Only worth parsing if you specifically need one draw call.
-- `Vector/` — SVG sources, for when you need the art at arbitrary resolution.
+- `Vector/` — the SVG sources, and **the style reference: read it before drawing
+  anything.** Kenney's 2D packs are Flash exports, so every path is
+  `fill="..." stroke="none"` and the darker rim around a shape is a *separate
+  filled path underneath*, not a stroke. The rule that makes a new sprite look
+  native is in there and is invisible in the rasters: **the rim is the fill's own
+  hue darkened, never black and never grey.** Knowing that, you can author with
+  an ordinary SVG `stroke` in the fill's darker shade and render identically.
+  Also useful when you genuinely need the art at another resolution.
 
 **UI packs** additionally carry `Font/` (Kenney Future .ttf) and `Sounds/`, and
 their `PNG/` is split by colour theme (Blue, Green, Grey...). The panels and
@@ -197,4 +212,60 @@ plain textures smears the corners, and that is what makes Kenney UI look cheap.
 
 Pixel-art packs need texture filtering set to **nearest** or they blur; in Godot
 that is a project setting (`rendering/textures/canvas_textures/default_texture_filter`),
-not something to fix file by file.
+not something to fix file by file — but **vector packs (Tower Defense, Space
+Shooter, Abstract Platformer…) are anti-aliased and must stay on the default
+`linear`.** Setting nearest on those hard-edges every curve Kenney drew smooth.
+`kenney_probe2d.py` tells you which you have: a pack where ~100% of opaque pixels
+are exactly a palette entry is pixel art, and one with thousands of blend shades
+is vector.
+
+### Adding a sprite to a 2D pack
+
+The 2D counterpart of section 5, and it needs its own probe because none of the
+3D contract applies — there is no pivot, no facing, no triangle budget.
+
+```bash
+python <skill dir>/scripts/kenney_probe2d.py "<pack dir>"                 # the contract
+python <skill dir>/scripts/kenney_probe2d.py "<pack dir>" --check new.png # the gate
+```
+
+Standard library only; it decodes PNG itself (zlib + struct, no Pillow) and
+writes nothing. `--check` exits 1 on a mismatch, so it works as a gate. Like
+`style_probe.py --check` it excludes the candidate from the reference scan — a
+new sprite sitting in the pack folder would otherwise help define the contract it
+is being judged against.
+
+What it measures, and why each one decides whether the sprite belongs:
+
+| Line | What to do with it |
+|---|---|
+| `CANVAS` | Author at exactly this size. A tile pack's canvas **is** its grid cell, so a sprite drawn "about the same size" lands off the grid by the difference. A pack with *no* shared canvas is a sprite pack — its files are cropped to their own art, and `--check` stops enforcing a canvas. |
+| `RETINA` | If the pack ships a 2x set, ship both or the pack stops being uniform the moment someone imports the retina folder. Measured, not assumed. |
+| `CONTENT BOX` | The "does it belong" number. Every neighbour leaves the same air around itself, so an object drawn to the full canvas reads as oversized even when its colours match. |
+| `FULL-BLEED` | Terrain tiles, which reach all four edges and are the exception to every margin rule. |
+| `PALETTE` | The colours Kenney chose, separated from the blends between them. |
+
+**The one rule that is not guessable, and the reason this ships as a script
+rather than as advice: "on-palette" cannot mean "equals a palette entry."** The
+vector packs are anti-aliased, so a pixel on the seam between two flat fills
+lands *on the segment between those two colours* in RGB. On the Tower Defense
+pack only 83% of opaque pixels are exactly a palette entry; the other 17% are
+those blends, and exact matching false-fails on every sprite in the pack,
+Kenney's own included. The test has to be **distance to the nearest segment
+between some pair of palette entries**. Measured there: judging any one sprite
+against the other 298 puts the worst legitimate blend at **7**, while an
+off-palette magenta dropped in as a negative control sits at **188** and black at
+**151**. The tolerance is 12, and it holds with no false failures across five
+packs of different shapes.
+
+The same segment metric is what separates a palette from a blend when deriving
+it, which is why frequency-sorting alone does not work: on Tower Defense, `#2ECC71`
+is the most common colour in the pack and `#2DCB70` — one unit away, an anti-
+aliased shade of it — is the 29th, ahead of fills that are genuinely Kenney's.
+1270 shades collapse to 26 entries under clustering.
+
+Two shapes make the palette gate inapplicable, and the report says so rather than
+reporting a number that means nothing: a **shaded** pack (Space Shooter
+Remastered is only 53% exact, and Kenney's own art reaches ~11 there — raise
+`--tolerance` to 16 before believing a failure), and a gradient or photographic
+pack, where clustering saturates and the check is skipped entirely.

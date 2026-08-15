@@ -16,6 +16,7 @@ The scripts are the only executable surface. All are stdlib-only except `store_a
 ```bash
 python skills/game-from-gibberish/scripts/seed.py --seed 41521    # deterministic; use to verify axes.md edits
 python skills/kenney-asset-kit/scripts/kenney_probe.py "<kit dir>" [--json]
+python skills/kenney-asset-kit/scripts/kenney_probe2d.py "<2D pack dir>" [--check FILE] [--json]
 python skills/blender-mcp-modelling/scripts/style_probe.py "<ref dir>" [--check FILE] [--json]
 python skills/godot-game-ui/scripts/scaffold_ui.py <godot project> [--only theme,hud] [--dest ui] [--force]
 python skills/godot-game-ui-juicy/scripts/scaffold_juicy_ui.py <godot project>
@@ -92,6 +93,17 @@ measures a reference set so you can *author* a new model into it, and its `--che
 that contract to gate an export (exit 1 on a mismatch). `--check` deliberately excludes the
 candidate from the reference scan: a new asset sitting in the kit folder would otherwise help
 define the contract it is being judged against.
+
+`kenney-asset-kit`'s own `kenney_probe2d.py` is the third of that family and the 2D arm of it:
+survey a 2D pack, or `--check` one sprite against it, same excluded-candidate rule, exit 1 on a
+mismatch. It decodes PNG itself (zlib + struct — no Pillow, so the stdlib-only property holds)
+and covers every colour type and bit depth Kenney ships. Its load-bearing idea is that
+**"on-palette" is distance to the nearest segment between two palette entries, not equality**:
+Kenney's vector art is anti-aliased, so a seam pixel between two flat fills lands part-way along
+the line between them, and exact membership false-fails on Kenney's own sprites. The same metric
+derives the palette (frequency alone cannot separate a fill from an anti-aliased shade of it).
+Tolerance 12 was set against a leave-one-out sweep: worst legitimate blend ~7, magenta control
+188, zero false failures over five packs. Changing that constant means re-running that sweep.
 
 Its `assets/bmcp_helpers.py` breaks the `assets/` convention below and the deviation is the point:
 it is never copied into a project. Blender reads it **off disk itself** via
