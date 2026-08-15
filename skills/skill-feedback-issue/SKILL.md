@@ -35,6 +35,15 @@ One issue per skill per session, and only when both hold:
   never says X, and it should" — but "this could be better" with no proposal is noise. If
   you cannot name what should change, you do not have an issue.
 
+**And if the fix is checkable, check it before filing.** Not a third condition — a report is
+still worth sending with an unverified proposal, as long as `Verified` says so. But when a
+claim can be measured rather than argued, measuring it routinely changes the report, and not
+always toward retracting: two reports in this tracker were *correct and understated*, and the
+extra scope came from building the check the report asked for and watching it find more than
+the report described. The cases that go the other way are worse — three fixes proposed against
+one repo were plausible, well argued, and would not have worked. Reading generates a
+hypothesis; running settles it.
+
 Ideas for skills that do not exist, taste, and preferences are not issues against a skill.
 If the user keeps a suggestions log (usually a path named in a `CLAUDE.md`), those go
 there — as does a copy of anything filed, since the log is the running record.
@@ -84,6 +93,13 @@ that no longer reproduce; it is normal for one of four to go. This step is also 
 near-miss claims get corrected — "the counter never punches" turned out to be a different
 function from the one that refuses, and the issue was better for reporting the contradiction
 rather than the guess.
+
+**Confirming a line proves the symptom lives there. It proves nothing about your fix.** Those
+are different claims and this step only settles the first, so record them separately in
+`Verified` below. If the mechanism can be reproduced in a scratch project in under a minute,
+do it — the proposed fixes that turn out wrong are the ones reasoned from a symptom to a
+plausible line without that step, and they are wrong often enough that a maintainer who trusts
+one ships the wrong repair.
 
 **While you have the source open, find the place the repo already applies your proposed rule
 somewhere else, and cite it.** This is the step's larger payoff and it is easy to miss,
@@ -138,9 +154,31 @@ retries it cost.
 
 **Proposed fix** — what should change. A diff if you have one, prose if you do not.
 
+**Verified** — which of these you actually established, and how: `symptom` (you saw it
+happen), `mechanism` (you know *why* — you traced it or reproduced it in isolation),
+`fix` (you ran the change and the symptom went away). Most honest reports stop at
+`symptom`. Say so; it is not a weak report, it is an accurately labelled one.
+
 **Environment** — `<plugin>@<version>` (`<sha>`), <OS>, <date>. Spotted by running it /
 by reading it.
 ```
+
+**The `Verified` line exists because the two fields above it are not the same kind of claim,
+and the template used to present them as if they were.** A line number is cheap to confirm —
+open the file, look. Whether a *fix* is correct is not confirmable by reading at all; it needs
+the mechanism traced or the change run. Put them adjacent with nothing distinguishing them and
+a report says "re-verified against the installed source at the line numbers cited" while
+meaning only the symptom, and the reader reasonably takes it to cover the whole thing. That is
+not hypothetical: of five issues this skill filed against one repo, **three carried a proposed
+fix that would not have fixed the bug** — a re-poll added to a liveness check that could never
+observe an exit, a branch on the wrong error list, a transform blamed for an offset that came
+from the window size. Every one was caught by the implementer reproducing the mechanism before
+applying the diff, and every one had a correctly verified symptom.
+
+It composes with the Environment line rather than repeating it: *spotted by* is how you found
+the defect, `Verified` is what you established about it. A finding spotted by reading may have
+no confirmed symptom at all — that is the weakest report worth filing, and it should say so
+plainly rather than borrowing the authority of a line number.
 
 Name the pinned version and sha every time. Feedback from a stale install is the most
 common false alarm in this loop, and that line is what lets the reader tell "already fixed
@@ -166,6 +204,12 @@ Quote what you actually saw. A paraphrased error is a search term that will neve
   public on a public repo, and it carries the user's name.
 - Do not paste the project's source, paths, or anything else from the session that the
   defect does not require. The issue is about the skill.
+- **Never claim a level of verification you did not reach.** `Verified` is the one field with
+  an incentive to inflate, because `fix` reads as more useful than `symptom` — and it is the
+  one field where being wrong costs the reader a wasted implementation rather than a wasted
+  read. Omitting it is not neutral either; a report with no `Verified` line reads as though
+  everything in it was checked equally. When in doubt, claim the lower level and say what
+  would settle it.
 - If `gh` fails, report it and write the note. Do not retry with different credentials.
 
 ## Report back
@@ -173,3 +217,8 @@ Quote what you actually saw. A paraphrased error is a search term that will neve
 The issue URL, one line on what it says, and the honest state of the loop: nothing is fixed
 yet, and a fix reaches this machine only after a merge, a version bump and a
 `/plugin update`.
+
+Say the `Verified` level out loud here too. "Filed, symptom verified, fix untested" is the
+sentence that tells the user whether they can hand the issue to someone or should reproduce
+the mechanism first, and it is the last chance to say it before the report is read by someone
+who cannot ask.
