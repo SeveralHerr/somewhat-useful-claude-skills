@@ -12,18 +12,87 @@ the .uid sidecars and the global class cache; the script reminds you rather than
 synthesise uids itself, because a hand-made uid that collides is much worse than a missing
 one.
 
+--palette swaps the PALETTE block in ui_theme.gd for one of the named palettes in
+references/palettes.md. The palettes live in that Markdown file rather than in here for the
+same reason seed.py reads axes.md: tuning the art direction should be editing a wordlist, not
+editing a script. Choosing one is not cosmetic housekeeping to do later — the kit has to ship
+some default, so a project that never picks comes out warm amber whatever it is about.
+
 Usage:
-    python scaffold_ui.py /path/to/godot/project
-    python scaffold_ui.py . --only hud,theme
-    python scaffold_ui.py . --dest ui --force
+    python scaffold_juicy_ui.py /path/to/godot/project
+    python scaffold_juicy_ui.py . --only hud,theme
+    python scaffold_juicy_ui.py . --dest ui --force
+    python scaffold_juicy_ui.py . --palette bloodmoon
+    python scaffold_juicy_ui.py --list-palettes
 """
 
 from __future__ import annotations
 
 import argparse
+import re
 import shutil
 import sys
 from pathlib import Path
+
+PALETTES_MD = Path(__file__).resolve().parent.parent / "references" / "palettes.md"
+
+# Every constant a palette is allowed to set. BACKDROP_OPAQUE is deliberately absent: it is
+# derived from BACKDROP inside the template, and a palette that set it directly would
+# reintroduce exactly the drift that deriving it was meant to end.
+PALETTE_KEYS: frozenset[str] = frozenset({
+    "ACCENT", "ACCENT_DEEP", "TEXT", "TEXT_DIM", "TEXT_FAINT",
+    "PANEL_FILL", "PANEL_FILL_DEEP", "PANEL_BORDER", "BACKDROP",
+    "CHIP_FILL", "CHIP_INK", "SLOT_EMPTY", "GOOD", "BAD", "SHADOW", "OUTLINE",
+})
+
+# [ \t] rather than \s throughout: \s matches newlines, so a trailing \s*$ swallows the blank
+# line after each constant and quietly reflows the PALETTE block.
+_CONST_RE = re.compile(r"^const[ \t]+([A-Z_]+)[ \t]*:[ \t]*Color[ \t]*=[ \t]*(Color\(.*\))[ \t]*$", re.M)
+
+
+def parse_palettes(path: Path) -> dict[str, dict[str, str]]:
+    """Read references/palettes.md into {palette name: {CONST: "Color(...)"}}.
+
+    Every `## <name>` heading starts a palette; the fenced block under it supplies its
+    constants. Prose between headings is ignored, so the file stays readable as documentation.
+    """
+    if not path.is_file():
+        sys.exit(f"error: palette list not found at {path}")
+    out: dict[str, dict[str, str]] = {}
+    # Split on level-2 headings, keeping the name with the body that follows it.
+    parts = re.split(r"^##\s+(.+?)\s*$", path.read_text(encoding="utf-8"), flags=re.M)
+    for name, body in zip(parts[1::2], parts[2::2]):
+        consts = {m.group(1): m.group(2) for m in _CONST_RE.finditer(body)}
+        # Headings like "How to read a palette" carry no constants and are not palettes.
+        if consts:
+            out[name.strip()] = consts
+    return out
+
+
+def apply_palette(source: str, name: str, palettes: dict[str, dict[str, str]]) -> str:
+    """Substitute one palette's constants into ui_theme.gd's PALETTE block."""
+    if name not in palettes:
+        sys.exit(f"error: unknown palette {name!r}. Choose from: {', '.join(sorted(palettes))}")
+    consts = palettes[name]
+
+    unknown = set(consts) - PALETTE_KEYS
+    if unknown:
+        sys.exit(f"error: palette {name!r} sets unknown constant(s): {', '.join(sorted(unknown))}")
+    missing = PALETTE_KEYS - set(consts)
+    if missing:
+        sys.exit(f"error: palette {name!r} is missing: {', '.join(sorted(missing))}")
+
+    def swap(m: re.Match[str]) -> str:
+        key = m.group(1)
+        return f"const {key}: Color = {consts[key]}" if key in consts else m.group(0)
+
+    result, _ = _CONST_RE.subn(swap, source)
+    # A template whose constants were renamed would silently keep the old palette otherwise.
+    for key, value in consts.items():
+        if f"const {key}: Color = {value}" not in result:
+            sys.exit(f"error: could not set {key} in ui_theme.gd - template and palette list "
+                     f"have drifted apart.")
+    return result
 
 # name -> (template filename, depends on, one-line description)
 _UI = ("theme", "motion", "juice")
@@ -122,13 +191,32 @@ def resolve(names: list[str]) -> list[str]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("project", type=Path, help="Godot project directory (contains project.godot)")
+    ap.add_argument("project", type=Path, nargs="?",
+                    help="Godot project directory (contains project.godot)")
     ap.add_argument("--dest", default="scripts/ui",
                     help="destination relative to the project (default: scripts/ui)")
     ap.add_argument("--only", default="all",
                     help="comma-separated subset: " + ",".join(PIECES) + " (default: all)")
     ap.add_argument("--force", action="store_true", help="overwrite files that already exist")
+    ap.add_argument("--palette", default="amber",
+                    help="palette from references/palettes.md (default: amber). "
+                         "Pick one from the game's tone - the default is a default, not a "
+                         "recommendation.")
+    ap.add_argument("--list-palettes", action="store_true",
+                    help="print the available palettes and exit")
     args = ap.parse_args()
+
+    palettes = parse_palettes(PALETTES_MD)
+
+    if args.list_palettes:
+        print("Palettes in " + PALETTES_MD.name + ":\n")
+        for name in palettes:
+            print(f"  {name:<12} accent {palettes[name]['ACCENT']}")
+        print("\nSee references/palettes.md for what each one is for.")
+        return 0
+
+    if args.project is None:
+        ap.error("the following arguments are required: project")
 
     project: Path = args.project.resolve()
     if not (project / "project.godot").is_file():
@@ -152,7 +240,12 @@ def main() -> int:
         if target.exists() and not args.force:
             skipped.append(filename)
             continue
-        shutil.copyfile(templates / filename, target)
+        if filename == "ui_theme.gd":
+            source = (templates / filename).read_text(encoding="utf-8")
+            target.write_text(apply_palette(source, args.palette, palettes),
+                              encoding="utf-8", newline="\n")
+        else:
+            shutil.copyfile(templates / filename, target)
         written.append(filename)
 
     rel = dest.relative_to(project).as_posix()
@@ -180,9 +273,22 @@ def main() -> int:
             if name in installed:
                 print(SNIPPETS[name])
 
+    if "ui_theme.gd" in written:
+        if args.palette == "amber":
+            print(
+                "Palette: amber (the default). If this game is not warm and golden, pick one\n"
+                "that fits its tone and re-run with --force -- an unchosen palette is the most\n"
+                "common thing wrong with a UI built from this kit:\n"
+                "\n    python scaffold_juicy_ui.py . --only theme --palette <name> --force\n"
+                f"\n  available: {', '.join(sorted(palettes))}  (see references/palettes.md)\n"
+            )
+        else:
+            print(f"Palette: {args.palette}.\n")
+
     print(
-        "Re-skin by editing the PALETTE / TYPE / METRICS blocks at the top of ui_theme.gd.\n"
-        "Nothing else hard-codes a colour, so that block is the whole art direction.\n"
+        "Re-skin further by editing the PALETTE / TYPE / METRICS blocks at the top of\n"
+        "ui_theme.gd. Nothing else hard-codes a colour, so that block is the whole art\n"
+        "direction.\n"
         "\n"
         "Tune the motion in the FEEL block at the top of ui_juice.gd. `UiJuice.enabled =\n"
         "false` disables every animation globally (accessibility, or deterministic tests) and\n"

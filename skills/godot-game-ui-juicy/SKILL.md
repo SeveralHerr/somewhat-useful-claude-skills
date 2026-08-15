@@ -18,7 +18,7 @@ rather than typing a path, and do not assume `~/.claude/skills/...`, which only 
 loose install.
 
 ```bash
-python <skill dir>/scripts/scaffold_juicy_ui.py /path/to/project
+python <skill dir>/scripts/scaffold_juicy_ui.py /path/to/project --palette bloodmoon
 godot --headless --path /path/to/project --import   # generates .uid sidecars + class cache
 ```
 
@@ -31,6 +31,19 @@ cp <skill dir>/assets/juice_test.gd <project>/juice_test.gd
 godot --headless --path <project> --script res://smoke_test.gd   # SMOKE: ALL PASS
 godot --headless --path <project> --script res://juice_test.gd   # JUICE: ALL PASS
 ```
+
+**Pick `--palette` from the game's tone, as part of installing — not as a later polish
+step.** `references/palettes.md` carries six: `amber` (warm, lamplit, collecting),
+`clinical` (cold, institutional, dry), `bloodmoon` (horror), `candy` (puzzle, casual,
+children), `noir` (monochrome, stealth, detective), `verdant` (nature, farming, outdoors).
+`--list-palettes` prints them without touching a project.
+
+The default is `amber`, and it is a default rather than a recommendation. A UI nobody chose
+a palette for comes out warm and golden whether the game is a horror piece or a spreadsheet
+simulator, and "it all looks yellow" is the most common thing wrong with a UI built from
+this kit. If none of the six fit, install the closest and edit the PALETTE block —
+`palettes.md` ends with what to change first and which two pairs break if you get them
+wrong.
 
 `--only`, `--dest` and `--force` work as in the plain kit; dependencies resolve
 automatically.
@@ -264,6 +277,9 @@ one call site to change.
 kind of motion, how long each class of animation should last, and the annotated pattern for
 adding a new juice verb that degrades correctly. Read it when tuning beyond the table above
 or writing your own animated component.
+
+`references/palettes.md` — six ready-made palettes plus the two contrast pairs that break
+when a palette is written by hand. `--palette` reads this file at scaffold time.
 
 `assets/templates/` — the installable files. `ui_juice.gd` is the one worth reading in full;
 it is commented with the reasoning rather than the mechanics.

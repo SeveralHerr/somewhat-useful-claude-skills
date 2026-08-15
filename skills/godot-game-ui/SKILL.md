@@ -25,9 +25,22 @@ rather than typing a path, and do not assume `~/.claude/skills/...`, which only 
 loose install.
 
 ```bash
-python <skill dir>/scripts/scaffold_ui.py /path/to/project
+python <skill dir>/scripts/scaffold_ui.py /path/to/project --palette clinical
 godot --headless --path /path/to/project --import   # generates .uid sidecars + class cache
 ```
+
+**Pick `--palette` from the game's tone, as part of installing — not as a later polish
+step.** `references/palettes.md` carries six: `amber` (warm, lamplit, collecting),
+`clinical` (cold, institutional, dry), `bloodmoon` (horror), `candy` (puzzle, casual,
+children), `noir` (monochrome, stealth, detective), `verdant` (nature, farming, outdoors).
+`--list-palettes` prints them without touching a project.
+
+The default is `amber`, and it is a default rather than a recommendation. A UI nobody chose
+a palette for comes out warm and golden whether the game is a horror piece or a spreadsheet
+simulator, and "it all looks yellow" is the most common thing wrong with a UI built from
+this kit. If none of the six fit, install the closest and edit the PALETTE block —
+`palettes.md` ends with what to change first and which two pairs break if you get them
+wrong.
 
 `--only theme,hud` installs a subset (dependencies resolve automatically). `--dest` changes
 the target directory. `--force` overwrites. The script prints the integration snippet for
@@ -54,7 +67,9 @@ files know the accent colour they drift, and "the UI looks inconsistent" is almo
 this rather than a design failure.
 
 Re-skinning is then one block at the top of one file. A horror game and a candy-coloured
-puzzler differ by about fifteen constants.
+puzzler differ by exactly sixteen constants — which is why `references/palettes.md` can hold
+a whole art direction as a code block, and why `--palette` can swap one in at scaffold time
+by substituting sixteen lines.
 
 ### 2. Every label gets an outline *and* a shadow
 
@@ -352,6 +367,9 @@ which is otherwise an annoying half hour.
 you are not installing the whole kit: the roll-up counter, the queued card, the escalating
 shout, the two-shape prompt, and the vector glyph. Read it when adapting rather than
 scaffolding, or when a piece needs to behave differently from the template.
+
+`references/palettes.md` — six ready-made palettes plus the two contrast pairs that break
+when a palette is written by hand. `--palette` reads this file at scaffold time.
 
 `assets/templates/` — the installable files themselves. Read the one you are adapting;
 they are commented with the reasoning, not just the what.
