@@ -96,9 +96,15 @@ Tuning the skill's output means editing the wordlists, not the script.
 
 - Skills document failure *symptoms* and the reason behind a rule, not just the rule. That prose
   is the product; match its density when adding to a `SKILL.md`.
-- Refer to a skill's own files as `<skill dir>/scripts/...`. Two SKILL.mds still hardcode
-  `~/.claude/skills/<name>/...`, which does not resolve under a plugin install — fix those to
-  `<skill dir>` rather than copying the pattern.
+- Refer to a skill's own files as `<skill dir>/scripts/...`, never `~/.claude/skills/<name>/...`,
+  which only resolves for a loose install and not under the plugin cache. The only remaining
+  mention of that path is in `skill-feedback-issue`, where it is deliberate — it is describing
+  loose installs.
+- A change to a `.gd` template is not done until both smoke tests and `juice_test.gd` pass, and
+  a new assertion is not done until it has been shown to FAIL against the defect it describes.
+  Mutate the scaffolded copy in the throwaway project (never the repo), run, and re-scaffold to
+  restore. Three assertions written here initially passed against the bug they were meant to
+  catch — one was measuring a Container that is stretched regardless of its own alignment.
 - The Godot kit is deliberately asset-free: no `.png`, `.ttf`, `.tres` or `.tscn` — colours come
   from one theme file and icons are drawn in `_draw()`. Eval assertions enforce this.
 - `.gitattributes` forces LF; keep scripts POSIX-shebanged and path-agnostic (they run on Windows

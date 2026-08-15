@@ -73,6 +73,11 @@ func _build() -> void:
 
 	var col: VBoxContainer = VBoxContainer.new()
 	col.add_theme_constant_override("separation", 10)
+	# Centred vertically, which is a no-op when the collection grid is present (it expands and
+	# takes the slack) and the whole fix when it is not: heading, verdict, one stat row and two
+	# buttons otherwise stack in the top third above a screen-height of empty backdrop, which
+	# reads as a screen that failed to finish loading.
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	margin.add_child(col)
 
 	col.add_child(UiTheme.make_label(heading, 62, UiTheme.ACCENT))

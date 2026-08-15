@@ -20,6 +20,13 @@ extends CanvasLayer
 
 signal resume_requested()
 signal restart_requested()
+## "Quit to menu" — leave the run, not the game. Named to match ResultsScreen.menu_requested,
+## because the two screens offer the same choice and an integrator will wire them to the same
+## handler. It used to be called quit_requested here and menu_requested there, and the obvious
+## reading of a signal named quit_requested is get_tree().quit() — so the button labelled
+## "Quit to menu" closed the application. TitleScreen.quit_requested is the one that means it.
+signal menu_requested()
+## Only emitted by the optional "Quit to desktop" button below. Really quits.
 signal quit_requested()
 signal sensitivity_changed(value: float)
 signal volume_changed(value: float)
@@ -27,6 +34,10 @@ signal volume_changed(value: float)
 @export var title_text: String = "Paused"
 @export var subtitle_text: String = ""
 @export var show_restart: bool = true
+## Off by default: in most games the pause menu returns you to a title screen that has its own
+## Quit, and two adjacent buttons whose labels both start with "Quit" is how a player loses a
+## run by misreading one of them.
+@export var show_quit_to_desktop: bool = false
 
 var _sensitivity: HSlider = null
 var _volume: HSlider = null
@@ -88,7 +99,9 @@ func _build() -> void:
 	col.add_child(_button("Resume", resume_requested, true))
 	if show_restart:
 		col.add_child(_button("Restart", restart_requested, false))
-	col.add_child(_button("Quit to menu", quit_requested, false))
+	col.add_child(_button("Quit to menu", menu_requested, false))
+	if show_quit_to_desktop:
+		col.add_child(_button("Quit to desktop", quit_requested, false))
 
 	UiMotion.pop_in(panel, 0.9, 0.22)
 

@@ -43,7 +43,11 @@ Point it at the kit folder; it finds the model directory itself and prefers
 | `BASE` | Where the model's lowest point sits. Non-zero means the kit expects a floor at that offset, not at 0. |
 | `FACING` | The kit's front axis, inferred from where the tall mass sits — a backrest, headboard or cistern is at the *back*. Heuristic: if it prints a split-vote warning, check two obvious models by hand. |
 | `COMMON FOOTPRINT WIDTHS` | A spike well below the grid unit is the kit's **module step** — the Furniture Kit's 0.43 kitchen units, wall segments, shelf runs. Lay runs out on that step, not on the grid. |
+| `STRUCTURAL HEIGHT` | The only *vertical* number in the report, and the one an interior turns on: the ceiling plane, the height a hanging lamp seats against, the clearance a first-person camera needs. Absent when the kit has no wall pieces — then the height is your decision, not the kit's. |
+| `NO MODULES NAMED` | What the kit will not give you. `ceiling`/`roof` missing from an interior kit means it is a **dollhouse** kit, meant to be seen from above. Enclose it by reusing the floor tile rotated 180° about X with its underside at wall height — or keep the open top deliberately. |
+| `TRIANGLE BUDGET` | The other half of "does my model belong here". An order of magnitude over the median reads as foreign however correct the colours are. |
 | `TEXTURES` | `external` means the kit is textured, not vertex-coloured: copy the `Textures/` folder next to the models or everything imports white. |
+| `PALETTE` | Only printed for untextured kits, where these ~15 materials **are** the art style. Copy them; do not match them by eye. The `--json` `rgba` is the linear value to reuse verbatim — the printed hex is sRGB for reading, and a round trip through it will not land back on the kit's number. |
 
 Kenney's world scale is roughly **1 unit ≈ 2 m** in the interior kits — a 1.29-unit
 wall is a 2.5 m ceiling. Sanity-check your room sizes against that before
@@ -112,6 +116,37 @@ This is cheap and it is what actually catches things. On one 93-item build it
 found five bugs no screenshot showed: a lamp measuring 7 units across, a rug
 crossing two walls, a fridge 0.09 wider than the run it sat in, opaque
 auto-generated node names, and an entire kit rotated backwards.
+
+## 5. Adding a model to a kit
+
+The mirror image of everything above, and the place users go the moment a kit
+runs out of pieces. Conformance is a **numeric contract**, not a matter of taste,
+and every field of it is in the probe's report: the pivot convention, base at
+y = 0, the facing axis, the module step your footprint should land on, the
+palette, and the triangle budget.
+
+Two rules are worth stating because they are re-derived wrongly every time:
+
+- **Build wholly in Blender's +X/+Y/+Z octant** and the corner-pivot and
+  base-at-zero conventions come out for free, because the glTF exporter maps
+  `gltf.y = blender.z` and `gltf.z = -blender.y`.
+- **Material names are part of the contract.** Blender appends `.001` when a
+  stale datablock already holds the name, and it exports silently:
+  `carpetDarker.001` is a *different* material to the engine, which breaks the
+  one property that makes a kit a kit.
+
+For the authoring loop itself — driving Blender, framing a render to look at the
+result, and gating the export against the reference set — use
+**`blender-mcp-modelling`**. Its `style_probe.py --check <file.glb>` is the
+conformance gate this skill deliberately does not duplicate: it re-derives the
+contract from the reference models and exits non-zero on a mismatch. The two
+skills are complements — `kenney_probe.py` measures a kit so you can *place*
+from it, `style_probe.py` measures it so you can *author* into it.
+
+One trap that applies to both: a generator that reads the kit directory and
+writes its output back into that same directory will, on the second run, read its
+own export as part of the reference. Keep the candidate out of the reference scan
+(`--check` does), or the contract quietly drifts to whatever you last produced.
 
 ## Gotchas
 

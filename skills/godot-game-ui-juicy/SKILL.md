@@ -11,8 +11,14 @@ than a form. Same code-only constraint: **no image files, no font files, no `.tr
 
 ## Fast path
 
+`<skill dir>` below is this skill's own directory. Under a plugin install that is
+`~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/skills/godot-game-ui-juicy/`, which
+is version-pinned — resolve it from `installPath` in `~/.claude/plugins/installed_plugins.json`
+rather than typing a path, and do not assume `~/.claude/skills/...`, which only exists for a
+loose install.
+
 ```bash
-python ~/.claude/skills/godot-game-ui-juicy/scripts/scaffold_juicy_ui.py /path/to/project
+python <skill dir>/scripts/scaffold_juicy_ui.py /path/to/project
 godot --headless --path /path/to/project --import   # generates .uid sidecars + class cache
 ```
 
@@ -20,8 +26,8 @@ Then verify — this takes fifteen seconds and separates "the kit is broken" fro
 is wrong":
 
 ```bash
-cp ~/.claude/skills/godot-game-ui-juicy/assets/smoke_test.gd <project>/smoke_test.gd
-cp ~/.claude/skills/godot-game-ui-juicy/assets/juice_test.gd <project>/juice_test.gd
+cp <skill dir>/assets/smoke_test.gd <project>/smoke_test.gd
+cp <skill dir>/assets/juice_test.gd <project>/juice_test.gd
 godot --headless --path <project> --script res://smoke_test.gd   # SMOKE: ALL PASS
 godot --headless --path <project> --script res://juice_test.gd   # JUICE: ALL PASS
 ```
@@ -88,6 +94,14 @@ hundred places the first time someone asks.
 The disabled path is the same code path a headless run takes, so the tests exercise it and it
 does not rot.
 
+**One switch, not two.** `UiJuice.enabled` and `UiJuice.speed` are views onto
+`UiMotion.enabled` / `UiMotion.speed`; setting either name sets the same flag. This kit
+shipped with them as separate flags, and the result was a "motion off" build whose counters
+still rolled, whose progress bars still slid, and whose headless assertions two frames after
+`set_counter()` read a mid-roll number that nothing explained. A switch with an exception is
+not a switch. If you add a motion helper of your own, route it through `UiMotion.tween()` or
+it will sit outside the switch in exactly the same way.
+
 ## The Godot-specific traps, all of which fail silently
 
 These are why this skill exists. None of them produce an error; all of them look like the
@@ -103,11 +117,38 @@ This is the one that will cost you an afternoon. It is why the pause panel is an
 `PRESET_CENTER` + `GROW_DIRECTION_BOTH` rather than parented to a `CenterContainer` — visually
 identical, but a `CenterContainer` child cannot be scale-animated at all.
 
-`UiJuice.can_transform(control)` is the check (`not (get_parent() is Container)`), and
-`stagger()` uses it to fall back to a fade-only cascade for container children automatically.
-Alpha is always safe: `modulate` is not a transform.
+`UiMotion.can_transform(control)` is the check (`not (get_parent() is Container)`) —
+`UiJuice.can_transform` forwards to it, so both `punch()`es obey one rule. `stagger()` uses it
+to fall back to a fade-only cascade for container children automatically. Alpha is always
+safe: `modulate` is not a transform.
+
+**The escape hatch is `UiMotion.transform_shell(node)`**: it wraps the node in a plain
+`Control` and returns the wrapper to add to the container in its place, so the shell absorbs
+the layout pass while the node inside keeps its transform. Use it whenever an element that
+must be punched has to live in a `VBox`/`HBox`/`GridContainer` — which is most of them. The
+HUD shells its stat rows, tool slots and big counter for exactly this reason; without them,
+`flash_stat()` and `set_active_tool()` were tinting and nothing else, and this kit shipped
+that way for two versions because the tint made it look like the punch was just subtle.
+
+A refused punch now emits a one-time `push_warning` naming the node. That is the whole
+difference between a five-minute fix and a defect that survives review.
 
 **Symptom to recognise:** the thing fades in correctly but never grows.
+
+### A HUD that is not click-through kills first-person mouse look
+
+Not a motion bug, but it lands in the same session and it is the most expensive one in this
+kit's history. `Panel` and `PanelContainer` default to `MOUSE_FILTER_STOP`. In a
+captured-cursor game every `InputEventMouseMotion` carries the viewport centre — where the
+crosshair sits — so GUI picking consumes it, marks it handled, and `_unhandled_input` never
+runs. The player can walk, interact and place things, but cannot turn their head, and the
+camera controller they go and read is correct.
+
+`GameHud` now sweeps its whole subtree to `MOUSE_FILTER_IGNORE` after every build. If you
+build your own HUD component, do the same rather than setting the flag node by node — the
+defect is one forgotten line away, permanently.
+
+**Symptom to recognise:** everything works except looking around.
 
 ### A Tween on a paused tree freezes unless you say otherwise
 
@@ -148,6 +189,11 @@ scale is often 0.667 or 2.0 rather than 1.0. An exit that tweens `scale` to a li
 `Vector2.ONE * 0.94` makes a 4K UI lurch to a quarter size before shrinking. Every function
 here captures `target.scale` first and animates relative to it.
 
+`UiMotion.punch()` and `pop_in()` obey this too — they remember each node's first-seen scale
+rather than snapping to `Vector2.ONE`. Remembering it beats re-reading `scale` at call time:
+a second punch landing while the first is still settling would otherwise treat the inflated
+value as the resting one, and the element creeps a little larger on every hit.
+
 ## Tuning
 
 The `FEEL` block at the top of `ui_juice.gd` is the whole personality:
@@ -171,6 +217,8 @@ Reach for these when the player should *feel* something rather than read it:
 ```gdscript
 hud.flash_stat(&"coins", UiTheme.GOOD)     # tint + squash: something happened here
 hud.set_active_tool(2)                     # punches the selected slot
+hud.toast("Kitchen complete")              # corner line, no interruption
+hud.set_crosshair_state(GameHud.Cross.BLOCKED)  # "not there" — see the plain kit's SKILL.md
 hud.shake(9.0)                             # damage, refusal, impact
 hud.flash_screen(Color(1, 0.2, 0.2, 0.35)) # full-screen pulse
 pause.dismiss()                            # exit animation, then free
@@ -186,6 +234,7 @@ UiJuice.punch(host, control, 0.16)                  # squash-and-stretch
 UiJuice.shake(host, control, 9.0)
 UiJuice.flash(host, Color(1,1,1,0.5))
 UiJuice.breathe(host, control)                      # slow idle loop
+vbox.add_child(UiMotion.transform_shell(row))       # so `row` can be punched at all
 ```
 
 Squash-and-stretch is deliberately anisotropic — wider than it is tall on the way out. A
@@ -195,6 +244,19 @@ impact, which is what you actually want when a counter ticks.
 Use `shake` sparingly and briefly. A shake that outlasts the event it describes stops meaning
 "impact" and starts meaning "the UI is broken". Shaking the HUD when the *world* should shake
 is the most common misuse.
+
+## Wiring the shell screens
+
+`PauseMenu` emits `resume_requested`, `restart_requested`, `menu_requested`,
+`sensitivity_changed`, `volume_changed` — and `quit_requested` only when you set
+`show_quit_to_desktop = true`. `ResultsScreen` emits `again_requested` and `menu_requested`;
+`TitleScreen` emits `play_requested` and `quit_requested`.
+
+`menu_requested` is the same intent on both screens on purpose, so wiring them to one handler
+is correct. Earlier versions had the pause menu's "Quit to menu" button emit `quit_requested`;
+integrators wired that to `get_tree().quit()`, and the button labelled *quit to menu* closed
+the game. If you are upgrading a project that connected `pause.quit_requested`, that is the
+one call site to change.
 
 ## Reference
 

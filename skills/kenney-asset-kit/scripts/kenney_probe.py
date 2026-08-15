@@ -110,6 +110,48 @@ IDENTITY = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
 # ---------------------------------------------------------------------- measure
 
 
+def _srgb_hex(linear):
+    """glTF baseColorFactor is LINEAR; every art tool shows sRGB. Convert, or the
+    hex you copy into Blender is visibly darker than the kit."""
+    out = ""
+    for c in linear[:3]:
+        c = min(max(c, 0.0), 1.0)
+        s = 12.92 * c if c <= 0.0031308 else 1.055 * (c ** (1 / 2.4)) - 0.055
+        out += "%02X" % int(round(s * 255))
+    return "#" + out
+
+
+def _material_table(doc):
+    """name -> {rgba, hex, metallic, roughness}, with glTF DEFAULTS applied.
+
+    Applying the defaults is the whole point. Blender omits `roughnessFactor` and
+    `metallicFactor` when they equal the spec defaults, so comparing raw JSON
+    presence reports a drift that is not there — the worst possible failure for a
+    check that is meant to gate an export.
+    """
+    table = {}
+    for m in doc.get("materials", []):
+        pbr = m.get("pbrMetallicRoughness", {})
+        rgba = pbr.get("baseColorFactor", [1.0, 1.0, 1.0, 1.0])
+        table[m.get("name", "?")] = {
+            "rgba": [round(c, 6) for c in rgba],
+            "hex": _srgb_hex(rgba),
+            "metallic": round(pbr.get("metallicFactor", 1.0), 4),
+            "roughness": round(pbr.get("roughnessFactor", 1.0), 4),
+        }
+    return table
+
+
+def _triangles(doc, prim):
+    """Triangle count for one primitive. Mode 4 is TRIANGLES and is the default."""
+    if prim.get("mode", 4) != 4:
+        return 0
+    if "indices" in prim:
+        return doc["accessors"][prim["indices"]]["count"] // 3
+    pos = prim.get("attributes", {}).get("POSITION")
+    return doc["accessors"][pos]["count"] // 3 if pos is not None else 0
+
+
 def measure(path, want_vertices=True):
     """Measure one model. Returns a dict, or None if it has no geometry."""
     doc, buffers = _load_gltf(path)
@@ -119,6 +161,7 @@ def measure(path, want_vertices=True):
     lo = [float("inf")] * 3
     hi = [float("-inf")] * 3
     verts = []
+    tris = 0
 
     stack = [(i, IDENTITY) for i in scene.get("nodes", [])]
     while stack:
@@ -130,6 +173,7 @@ def measure(path, want_vertices=True):
                 pos = prim.get("attributes", {}).get("POSITION")
                 if pos is None:
                     continue
+                tris += _triangles(doc, prim)
                 acc = doc["accessors"][pos]
                 if want_vertices:
                     for v in _read_positions(doc, buffers, pos):
@@ -163,6 +207,7 @@ def measure(path, want_vertices=True):
         for i in range(3)
     ]
 
+    palette = _material_table(doc)
     info = {
         "name": os.path.splitext(os.path.basename(path))[0],
         "size": [round(v, 4) for v in size],
@@ -170,14 +215,10 @@ def measure(path, want_vertices=True):
         "max": [round(v, 4) for v in hi],
         "pivot_in_box": [round(v, 3) for v in pivot],
         "grounded": abs(lo[1]) < 0.01,
+        "triangles": tris,
         "materials": [m.get("name", "?") for m in doc.get("materials", [])],
-        "colors": {
-            m.get("name", "?"): [
-                round(c, 3)
-                for c in m.get("pbrMetallicRoughness", {}).get("baseColorFactor", [1, 1, 1, 1])
-            ]
-            for m in doc.get("materials", [])
-        },
+        "palette": palette,
+        "colors": {name: entry["rgba"] for name, entry in palette.items()},
         "external_images": [
             im["uri"] for im in doc.get("images", [])
             if im.get("uri") and not im["uri"].startswith("data:")
@@ -235,6 +276,11 @@ FACING_CONFIDENT = 0.18
 STRUCTURAL = ("floor", "wall", "tile", "ground", "road", "path", "base", "block",
               "platform", "ceiling", "roof", "track", "corner", "stairs",
               "corridor", "room", "bridge")
+
+# Families worth reporting as ABSENT. What a kit does not ship is a design fact
+# about it — a kit with floors and walls but no ceiling is a dollhouse kit, meant
+# to be seen from above — and it is invisible in a report that only lists finds.
+MODULE_FAMILIES = ("floor", "wall", "ceiling", "roof", "door", "window", "stairs")
 
 
 # ------------------------------------------------------------------- kit survey
@@ -305,6 +351,17 @@ def survey(kit_dir, limit=None):
     )
     widths = Counter(round(m["size"][0] / 0.05) * 0.05 for m in models)
 
+    # Wall height, separately from every footprint number above. For an enclosed
+    # interior this is the load-bearing measurement: the ceiling plane, the height a
+    # hanging lamp seats against, and the clearance a first-person camera needs.
+    walls = [m["size"][1] for m in models if m["name"].lower().startswith("wall")]
+    wall_height, wall_n = _mode(walls, 0.01) if walls else (None, 0)
+
+    absent = [f for f in MODULE_FAMILIES
+              if not any(m["name"].lower().startswith(f) for m in models)]
+
+    tris = sorted(m["triangles"] for m in models if m["triangles"])
+
     return {
         "kit": os.path.basename(os.path.normpath(kit_dir)),
         "model_dir": model_dir,
@@ -322,10 +379,57 @@ def survey(kit_dir, limit=None):
         "pivot": _pivot_summary(models),
         "base_y": _mode([m["min"][1] for m in models], 0.01),
         "common_widths": [(round(w, 2), n) for w, n in widths.most_common(6)],
+        "wall_height": wall_height,
+        "wall_height_n": wall_n,
+        "absent_families": absent,
+        "triangles": {
+            "min": tris[0] if tris else 0,
+            "median": tris[len(tris) // 2] if tris else 0,
+            "max": tris[-1] if tris else 0,
+        },
         "textured": sorted({im for m in models for im in m["external_images"]}),
         "materials": Counter(mat for m in models for mat in m["materials"]).most_common(8),
+        "palette": _palette_summary(models),
         "models": models,
     }
+
+
+# Two colours are the same colour if they agree to about a float32. Comparing
+# exactly reports a "kit inconsistency" on every material that survived an export
+# round trip - the Furniture Kit's carpetBlue is 0.867925 in four files and
+# 0.867924 in seven, which is a rounding artefact and not a design decision.
+COLOR_EPS = 1e-5
+
+
+def _same_color(a, b):
+    return len(a) == len(b) and all(abs(x - y) <= COLOR_EPS for x, y in zip(a, b))
+
+
+def _palette_summary(models):
+    """The kit's materials as an art-style contract: name, colour, metallic, roughness.
+
+    For an untextured kit this list IS the art style, and it is the one thing a new
+    model has to copy exactly rather than match by eye. Names are part of the
+    contract too: a stale datablock in Blender exports `carpetDarker.001`, which is
+    a different material to the engine and breaks the property that makes a kit a kit.
+    """
+    seen, uses, conflicts = {}, Counter(), set()
+    for m in models:
+        for name, entry in m.get("palette", {}).items():
+            uses[name] += 1
+            if name not in seen:
+                seen[name] = entry
+            elif not _same_color(seen[name]["rgba"], entry["rgba"]):
+                conflicts.add(name)
+    out = []
+    for name, n in uses.most_common():
+        e = seen[name]
+        out.append({
+            "name": name, "hex": e["hex"], "rgba": e["rgba"],
+            "metallic": e["metallic"], "roughness": e["roughness"],
+            "models": n, "inconsistent": name in conflicts,
+        })
+    return out
 
 
 def _pivot_summary(models):
@@ -377,6 +481,24 @@ def print_survey(s):
     print("MOST COMMON FOOTPRINT (all models): %s  (%d of %d)"
           % (s["modal_footprint"], s["modal_footprint_n"], s["count"]))
 
+    if s["wall_height"]:
+        print("STRUCTURAL HEIGHT: wall-like pieces stand %.2f units tall (%d of them)"
+              % (s["wall_height"], s["wall_height_n"]))
+        print("  Every other line here is a FOOTPRINT. This is the interior's load-bearing")
+        print("  number: the ceiling plane, the height a hanging lamp seats against, and the")
+        print("  clearance a first-person camera needs. At Kenney's ~1 unit = 2 m interior")
+        print("  scale that is a %.1f m room." % (s["wall_height"] * 2.0))
+
+    # Only meaningful for a kit that ships SOME of these families. A food or nature kit
+    # is missing all seven, and printing that says nothing except that it is not a
+    # building kit - which the STRUCTURAL PIECES line above already said.
+    if s["absent_families"] and len(s["absent_families"]) < len(MODULE_FAMILIES):
+        print("NO MODULES NAMED: %s" % ", ".join(s["absent_families"]))
+        print("  Absent is a design fact, not an oversight. A kit with floors and walls but no")
+        print("  ceiling is a dollhouse kit, meant to be seen from above; to enclose it for a")
+        print("  first-person camera, reuse the floor tile as the ceiling - rotated 180 deg")
+        print("  about X, seated so its UNDERSIDE rests at the wall height above.")
+
     print("PIVOT: %s" % ", ".join("%s x%d" % (p, n) for p, n in s["pivot"]))
     lead_pivot = s["pivot"][0][0] if s["pivot"] else ""
     if lead_pivot.startswith("corner at min-X/max-Z"):
@@ -407,12 +529,40 @@ def print_survey(s):
     print("  a spike well below the grid unit is the kit's module step "
           "(cabinet runs, wall segments)")
 
+    t = s["triangles"]
+    if t["max"]:
+        print("TRIANGLE BUDGET: min %d / median %d / max %d"
+              % (t["min"], t["median"], t["max"]))
+        print("  The other half of 'does my new model belong here'. A model an order of")
+        print("  magnitude over the median reads as foreign next to its neighbours however")
+        print("  correct its colours are.")
+
     if s["textured"]:
         print("TEXTURES: external - copy them alongside the models: %s"
               % ", ".join(s["textured"][:4]))
     else:
-        print("TEXTURES: none; flat per-material base colours (%s)"
-              % ", ".join(m for m, _ in s["materials"][:5]))
+        print("TEXTURES: none; flat per-material base colours - the PALETTE below IS the")
+        print("  art style, and it is copyable rather than matchable by eye.")
+        _print_palette(s)
+
+
+def _print_palette(s):
+    palette = s.get("palette", [])
+    if not palette:
+        return
+    print("PALETTE (%d materials; name, sRGB hex, metallic/roughness, models using it)"
+          % len(palette))
+    for e in palette[:20]:
+        print("  %-18s %s  m%.2f r%.2f  x%-4d %s" % (
+            e["name"], e["hex"], e["metallic"], e["roughness"], e["models"],
+            "!! two different colours share this name" if e["inconsistent"] else ""))
+    if len(palette) > 20:
+        print("  ... %d more (--json for all)" % (len(palette) - 20))
+    print("  Copy the LINEAR rgba from --json, not the hex, when authoring a matching")
+    print("  model: the hex is for reading, and a round trip through it will not land on")
+    print("  the kit's exact value. The material NAME is part of the contract too - Blender")
+    print("  appends .001 when a stale datablock holds the name, and `carpetDarker.001` is")
+    print("  a different material to the engine.")
 
 
 def print_models(s, wanted):

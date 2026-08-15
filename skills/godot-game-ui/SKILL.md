@@ -18,8 +18,14 @@ merged by several people at once.
 
 If the user wants working UI in their project, install the kit and wire it up:
 
+`<skill dir>` below is this skill's own directory. Under a plugin install that is
+`~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/skills/godot-game-ui/`, which is
+version-pinned — resolve it from `installPath` in `~/.claude/plugins/installed_plugins.json`
+rather than typing a path, and do not assume `~/.claude/skills/...`, which only exists for a
+loose install.
+
 ```bash
-python ~/.claude/skills/godot-game-ui/scripts/scaffold_ui.py /path/to/project
+python <skill dir>/scripts/scaffold_ui.py /path/to/project
 godot --headless --path /path/to/project --import   # generates .uid sidecars + class cache
 ```
 
@@ -94,6 +100,13 @@ a finished animation would have reached, just without the motion.
 Concretely: `UiMotion.tween(host)` returns `null` outside the tree; every caller handles
 null by snapping. Never call `create_tween()` directly in UI code.
 
+`UiMotion.enabled = false` forces that same null path everywhere, which is what makes it
+one switch rather than a preference: with it off, a test can set state and assert on the
+next line without pumping frames or waiting out a roll-up. `UiMotion.speed` scales every
+duration. Anything animated that does not route through `UiMotion` is outside the switch and
+will keep moving — which is exactly how a "motion off" build ends up with rolling counters
+and a headless assertion that reads a number nobody wrote.
+
 ### 6. The prompt's shape is decided by its text
 
 A contextual prompt has two jobs that look identical and are not:
@@ -165,9 +178,9 @@ they do not have to learn yours:
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│ ▣ 12/40    ← stat pill stack                             │
-│ ● 3/8         icon + count, one pill each                │
-│ $ 1,280                                                  │
+│ ▣ 12/40    ← stat pill stack        Kitchen complete  ←  │
+│ ● 3/8         icon + count, one pill each      toast     │
+│ $ 1,280                                    (transient)   │
 │ ▬▬▬▬▭▭▭▭   ← thin progress bar                          │
 │ ▸ hint breadcrumb                                        │
 │                                                          │
@@ -184,6 +197,40 @@ they do not have to learn yours:
 │ 1 2 3 4  ← tool slots                    big counter ↗   │
 └──────────────────────────────────────────────────────────┘
 ```
+
+### Announcements come in three sizes, and picking the wrong one costs attention
+
+`set_prompt()` is the standing line under the crosshair — it says what pressing a key would
+do, and it is the only one that persists. `toast()` is the corner line for something that
+just became true and does not need acting on: "Kitchen complete", "Autosaved". `shout()`
+takes the centre of the screen and interrupts, which is right for a combo and wrong for a
+milestone. `show_card()` is the payoff moment and queues rather than interrupting.
+
+Games that ship only a shout end up shouting about autosaves, and players learn to ignore
+the centre of the screen — which is where the one message that mattered was going to appear.
+
+### The crosshair has three states, not two
+
+`set_crosshair_state(Cross.NEUTRAL | Cross.HOT | Cross.BLOCKED)`; `set_crosshair_hot(bool)`
+still works and maps to the first two. `BLOCKED` shrinks and reddens rather than growing and
+goldening, because a refusal has to differ from a target in *shape* as well as colour — the
+crosshair is read peripherally while the player is looking at the object, not at it. Any game
+that lets the player place, stack or hand over an object needs the third state; expressing
+"you cannot put it there" by simply not turning the crosshair hot is indistinguishable from
+pointing at nothing.
+
+### The HUD can be read back, so tests do not walk its private nodes
+
+`stat_text(id)`, `prompt_text()`, `prompt_key()`, `held_text()`, `hint_text()`,
+`counter_text()`, `card_title()`, `toast_text()`, `crosshair_state()`, plus `layout_size()`
+and `layout_scale()`. Assert against these rather than
+`find_child("PromptLabel", true, false).text`: the `find_child` version couples every test to
+this file's private build order, so renaming a node fails a dozen assertions with a null
+dereference instead of a message. A write-only UI can only be checked by screenshot, and
+screenshot checks are the ones that stop being run.
+
+`counter_text()` is the exception worth knowing: it reports what is on screen, mid-roll
+included. Assert on it with motion disabled, or after the roll has finished.
 
 ## Structural gotchas that cost real time
 
@@ -215,6 +262,15 @@ to spend twenty minutes.
 hard-codes `SceneFlow.goto_menu()` only works in the project it was written for. Connecting
 three signals is the entire integration cost of reuse.
 
+**And the signal has to be named after the intent, not the button.** "Quit to menu" on the
+pause menu and "Main menu" on the results screen are the *same* request, so both emit
+`menu_requested`. `quit_requested` means leave the application, and only `TitleScreen` — and
+`PauseMenu` with `show_quit_to_desktop = true` — emits it. This kit shipped with the pause
+menu's "Quit to menu" wired to `quit_requested`, an integrator wired that to
+`get_tree().quit()`, and the button labelled *quit to menu* closed the game. A signal name
+is documentation that the compiler will not check, so the two screens offering the same
+choice must agree on it.
+
 **Set `pivot_offset` from the current size on every punch**, not once at `_ready`. A Control
 inside a container is resized after `_ready`, and a stale pivot makes the scale visibly
 swing from a corner.
@@ -226,8 +282,29 @@ Assert against `get_visible_rect().size`, or instantiate into a `SubViewport`, w
 clamped. (This is what test harnesses that offer an `instantiate_ui(scene, size)` helper are
 doing for you.)
 
-**`mouse_filter = IGNORE` on everything decorative.** A full-rect HUD `Control` that accepts
-mouse input silently eats clicks meant for the game.
+**`mouse_filter = IGNORE` on everything decorative — swept over the whole subtree, not set
+per node.** `Panel`, `PanelContainer` and `Button` default to `STOP`, so one forgotten line
+is enough, and the worst version of this failure has nothing to do with clicks: in a
+**captured-cursor first-person game every mouse-motion event carries the viewport centre**,
+which is exactly where the crosshair sits. GUI picking consumes it and marks it handled, so
+`_unhandled_input` never runs and the player can walk and interact but **cannot turn their
+head**. The camera controller is correct, which is why this costs an hour rather than a
+minute. `GameHud._make_click_through()` walks the tree after every build (and after
+`add_stat`/`build_tools`, which run later) so the default is safe and a clickable element
+has to opt back in deliberately.
+
+**A Container child cannot be scaled, so anything you punch needs a shell.**
+`Container.fit_child_in_rect` reassigns position, size, rotation *and* scale on every layout
+pass. `UiMotion.punch()` refuses such a node with a one-time `push_warning` rather than
+animating a property that will be overwritten — silent refusal is worse, because the tint
+that usually accompanies a punch still lands and the dead animation reads as "too subtle".
+Wrap the node with `UiMotion.transform_shell(node)` and add the *shell* to the container: the
+shell gets laid out and reset, the node inside it keeps its transform. The HUD does this for
+its stat rows, tool slots and the big counter.
+
+**Punches return to the RESTING scale, not to `1.0`.** Anything on a layer that `UiTheme.fit`
+has scaled is not at 1.0, and snapping there mid-animation makes the element lurch to full
+size before settling. `UiMotion` remembers each punched node's first-seen scale for this.
 
 ## Testing the UI headlessly
 
@@ -250,7 +327,7 @@ queue keeps the *first* card, checks the prompt drops its keycap on a status mes
 verifies the pause menu's buttons are `PROCESS_MODE_ALWAYS` and its signals fire.
 
 ```bash
-cp ~/.claude/skills/godot-game-ui/assets/smoke_test.gd <project>/smoke_test.gd
+cp <skill dir>/assets/smoke_test.gd <project>/smoke_test.gd
 godot --headless --path <project> --script res://smoke_test.gd    # prints SMOKE: ALL PASS
 ```
 

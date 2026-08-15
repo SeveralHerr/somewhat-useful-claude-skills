@@ -53,6 +53,15 @@ Only the `owner/name` slug is needed, and two files under `~/.claude/plugins/` p
 Skills installed loose under `~/.claude/skills/` have no repo behind them. Offer to edit
 those in place instead of filing anything.
 
+**Then re-verify each finding against the version that is installed now.** Findings usually
+arrive from an earlier session, and the install may have moved since — a defect fixed
+between versions is the most common wasted issue in this loop. Open the skill's own source
+at the resolved `installPath`, confirm each claim at a line number, and say in the
+Environment line which ones were re-checked. Withdraw the ones that no longer reproduce; it
+is normal for one of four to go. This step is also where near-miss claims get corrected —
+"the counter never punches" turned out to be a different function from the one that refuses,
+and the issue was better for reporting the contradiction rather than the guess.
+
 ## 2. Check for a duplicate first
 
 The failure mode of an automatic reporter is ten issues describing one defect. Search
@@ -109,7 +118,10 @@ Quote what you actually saw. A paraphrased error is a search term that will neve
 - **This files a report, and nothing else.** Do not branch, commit, push, or edit the skill
   in the repo — and never edit the plugin cache, which the next `/plugin update` overwrites,
   losing the fix and leaving the issue looking resolved when it is not.
-- One skill per issue. Two skills that both misbehaved get two issues.
+- One skill per issue. Two skills that both misbehaved get two issues. Several defects in
+  *one* skill belong in one issue, ordered worst first, saying what they share if anything
+  does — a maintainer reading five separate issues about the same file cannot see that four
+  of them have one cause.
 - Never file against a repo the user does not own without saying so first — an issue is
   public on a public repo, and it carries the user's name.
 - Do not paste the project's source, paths, or anything else from the session that the

@@ -34,12 +34,26 @@ extends RefCounted
 
 # ------------------------------------------------------------------- FEEL (tune here)
 
-## Master switch. False makes every animation below resolve instantly to its end state —
-## the same path a headless run takes, so it is exercised by the tests rather than rotting.
-static var enabled: bool = true
+## Master switch. False makes every animation resolve instantly to its end state — the same
+## path a headless run takes, so it is exercised by the tests rather than rotting.
+##
+## This is a view onto UiMotion.enabled rather than a second flag, and that matters: the HUD's
+## counters, bars and fades all go through UiMotion, so a switch that covered only this file
+## would leave a "motion off" build still rolling its numbers, and a headless assertion taken
+## two frames after set_counter() would read a mid-roll value. One switch, no exceptions.
+static var enabled: bool:
+	set(value):
+		UiMotion.enabled = value
+	get:
+		return UiMotion.enabled
 
-## Global multiplier on every duration. 0.7 for a snappy arcade feel, 1.3 for a languid one.
-static var speed: float = 1.0
+## Global multiplier on every duration, here and in UiMotion. 0.7 for a snappy arcade feel,
+## 1.3 for a languid one.
+static var speed: float:
+	set(value):
+		UiMotion.speed = value
+	get:
+		return UiMotion.speed
 
 const IN_TIME: float = 0.34
 ## Deliberately about a third of IN_TIME. See idea 1 above.
@@ -110,8 +124,8 @@ static func enter(host: Node, target: Control, style: Enter = Enter.POP, delay: 
 	if style == Enter.POP and not can_transform(target):
 		# Fall back rather than animate a property that will be overwritten before it is
 		# drawn — a silent no-op here looks like the tween never ran.
-		push_warning("UiJuice.enter: %s is a Container child, so its scale is reset every " % target.name
-			+ "layout pass. Anchor it instead, or it will only fade.")
+		UiMotion.warn_once(target, "UiJuice.enter: %s is a Container child, so its scale is " % target.name
+			+ "reset every layout pass. Anchor it instead, or it will only fade.")
 	center_pivot(target)
 	var rest: Vector2 = target.position
 	var rest_scale: Vector2 = target.scale
@@ -153,11 +167,14 @@ static func enter(host: Node, target: Control, style: Enter = Enter.POP, delay: 
 ## looking for the bug in your easing curves.
 ##
 ## Anything you intend to scale, rotate or slide therefore has to be anchored rather than
-## parented to a Container — or wrapped in a plain Control that the Container lays out while
-## the wrapped child moves freely inside it. Alpha is the exception: modulate is not a
-## transform, so fading works anywhere.
+## parented to a Container — or wrapped in a plain Control with UiMotion.transform_shell(),
+## which the Container lays out while the wrapped child moves freely inside it. Alpha is the
+## exception: modulate is not a transform, so fading works anywhere.
+##
+## The rule lives in UiMotion so that both punches obey the same one. Two functions named
+## punch() disagreeing about Containers is worse than either rule on its own.
 static func can_transform(c: Control) -> bool:
-	return c != null and not (c.get_parent() is Container)
+	return UiMotion.can_transform(c)
 
 
 ## Animate a list of Controls in one after another.
@@ -240,7 +257,15 @@ static func exit_then(host: Node, target: Control, done: Callable = Callable()) 
 ## an anisotropic one reads as something absorbing an impact, which is what you actually want
 ## when a counter ticks or a slot is selected.
 static func punch(host: Node, target: Control, amount: float = 0.16) -> void:
-	if target == null or not can_transform(target):
+	if target == null:
+		return
+	if not can_transform(target):
+		# Loud, not silent. A refused punch still lands its accompanying tint or text change,
+		# so it reads as "the animation is too subtle" and survives review indefinitely — this
+		# kit shipped two dead punches in its own HUD that way. Wrap the target in
+		# UiMotion.transform_shell() and the punch works inside the Container layout.
+		UiMotion.warn_once(target, "UiJuice.punch: %s is a Container child, so its scale is " % target.name
+			+ "reset on every layout pass. Wrap it with UiMotion.transform_shell().")
 		return
 	center_pivot(target)
 	var rest: Vector2 = target.scale

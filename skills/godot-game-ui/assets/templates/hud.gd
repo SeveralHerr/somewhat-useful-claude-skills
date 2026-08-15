@@ -11,12 +11,21 @@ extends CanvasLayer
 ##
 ## LAYOUT (matches the convention players already know from tidying/collection games):
 ##   top-left      stat pill stack + progress bar + hint breadcrumb
+##   top-right     toast (transient, corner-sized)
 ##   centre        crosshair, and a contextual prompt just below it
 ##   centre-upper  reward card (transient, queued)
 ##   centre        shout (transient, escalating)
 ##   bottom-centre held-item strip
 ##   bottom-right  big counter, e.g. carried/capacity
 ##   bottom-left   numbered tool/ability slots
+##
+## CLICK-THROUGH. Nothing in this HUD is clickable, and every Control in it is therefore
+## forced to MOUSE_FILTER_IGNORE after the build (see _make_click_through). This is not
+## tidiness: Panel and PanelContainer default to MOUSE_FILTER_STOP, and in a captured-cursor
+## first-person game every mouse motion event carries the viewport centre — which is exactly
+## where the crosshair sits. GUI picking consumes it and marks it handled, _unhandled_input
+## never runs, and the player can walk and interact but cannot turn their head. The camera
+## code looks correct because it is; this file was the bug.
 ##
 ## HEADLESS SAFETY. Everything animated goes through UiMotion, which snaps to the final
 ## value when it cannot tween. A headless test that pumps no frames therefore still ends up
@@ -32,6 +41,14 @@ extends CanvasLayer
 const CARD_HOLD: float = 2.2
 const CARD_Y: float = -300.0
 const SHOUT_Y: float = -170.0
+## How long a toast stays before it leaves on its own.
+const TOAST_HOLD: float = 2.4
+
+## Crosshair states. BLOCKED is the one people leave out and then need: a first-person game
+## that lets you place, stack or hand over objects has to say "not there" as clearly as it
+## says "here", and doing it by simply not turning the crosshair hot is indistinguishable
+## from pointing at nothing.
+enum Cross { NEUTRAL, HOT, BLOCKED }
 
 var _root: Control = null
 var _stat_stack: VBoxContainer = null
@@ -47,8 +64,11 @@ var _prompt_label: Label = null
 var _held_box: PanelContainer = null
 var _held_label: Label = null
 var _counter: Label = null
+var _counter_shell: Control = null
 var _toolbar: HBoxContainer = null
 var _shout: Label = null
+var _toast_box: PanelContainer = null
+var _toast_label: Label = null
 var _card: PanelContainer = null
 var _card_kicker: Label = null
 var _card_title: Label = null
@@ -61,7 +81,7 @@ var _tool_slots: Array[PanelContainer] = []
 var _card_queue: Array[Dictionary] = []
 var _card_busy: bool = false
 var _shown_counter: float = 0.0
-var _cross_hot: bool = false
+var _cross_state: Cross = Cross.NEUTRAL
 var _tweens: Dictionary = {}
 var _ui_scale: float = 1.0
 
@@ -125,7 +145,13 @@ func add_stat(id: StringName, glyph: UiTheme.Glyph.Kind, initial: String = "0") 
 	value.custom_minimum_size = Vector2(110.0, 0.0)
 	line.add_child(value)
 
-	_stat_stack.add_child(row)
+	# Shelled, not added directly. _stat_stack is a VBoxContainer, and a Container rewrites its
+	# children's scale on every layout pass — so a row added straight to it can never be
+	# scaled, and a punch on it would be dead code that nobody notices because the tint still
+	# lands. The shell is what the VBox lays out; the row inside it moves freely.
+	var shell: Control = UiMotion.transform_shell(row)
+	_stat_stack.add_child(shell)
+	_make_click_through(shell)
 	_stats[id] = {"row": row, "value": value, "icon": icon, "shown": 0.0}
 
 
@@ -248,15 +274,32 @@ func set_progress(ratio: float) -> void:
 ## Grow and gold the crosshair over anything interactable. Cheap to call every frame — it
 ## early-outs when the state has not changed.
 func set_crosshair_hot(hot: bool) -> void:
+	set_crosshair_state(Cross.HOT if hot else Cross.NEUTRAL)
+
+
+## The three-state version. BLOCKED shrinks and reddens instead of growing and goldening, so
+## "you cannot put it there" is a different shape as well as a different colour — the two
+## states have to be distinguishable in peripheral vision, which is where the crosshair
+## actually lives while the player is aiming at something else.
+func set_crosshair_state(state: Cross) -> void:
 	_ensure_built()
-	if _crosshair == null or hot == _cross_hot:
+	if _crosshair == null or state == _cross_state:
 		return
-	_cross_hot = hot
-	_cross_ring.add_theme_stylebox_override("panel", UiTheme.circle_box(
-		Color(0, 0, 0, 0), UiTheme.ACCENT if hot else UiTheme.with_alpha(UiTheme.TEXT, 0.72), 2
-	))
+	_cross_state = state
+	var tint: Color = UiTheme.with_alpha(UiTheme.TEXT, 0.72)
+	var target: Vector2 = Vector2.ONE
+	match state:
+		Cross.HOT:
+			tint = UiTheme.ACCENT
+			target = Vector2(1.35, 1.35)
+		Cross.BLOCKED:
+			tint = UiTheme.BAD
+			target = Vector2(0.78, 0.78)
+		_:
+			pass
+	_cross_ring.add_theme_stylebox_override(
+		"panel", UiTheme.circle_box(Color(0, 0, 0, 0), tint, 2))
 	var t: Tween = UiMotion.tween(self)
-	var target: Vector2 = Vector2(1.35, 1.35) if hot else Vector2.ONE
 	if t == null:
 		_crosshair.scale = target
 		return
@@ -282,6 +325,35 @@ func shout(text: String, color: Color = UiTheme.ACCENT, emphasis: float = 0.5) -
 		return
 	t.tween_interval(0.45 + e * 0.35)
 	t.tween_callback(func() -> void: UiMotion.fade_out(_shout, 0.3, 40.0))
+
+
+## Quiet corner announcement: "Kitchen complete", "Autosaved", "New tool unlocked".
+##
+## The middle rung between a prompt and a shout, and the one most kits leave out. A shout
+## takes the centre of the screen and interrupts what the player is looking at, which is right
+## for a combo and wrong for a milestone they should notice without being stopped. A toast
+## replaces whatever is already showing rather than queueing — by the time a second milestone
+## lands, the first is no longer news.
+func toast(text: String, color: Color = UiTheme.ACCENT) -> void:
+	_ensure_built()
+	if _toast_box == null or text.strip_edges().is_empty():
+		return
+	_toast_label.text = text
+	_toast_label.add_theme_color_override("font_color", color)
+	# Scale and alpha only, never position. The toast is anchored to a corner and re-shown many
+	# times per session; an entrance that moved it would have to restore the resting place
+	# exactly, and a rounding error there walks the toast across the screen over a long game.
+	UiMotion.replace(_tweens, _toast_box, null)
+	UiMotion.pop_in(_toast_box, 0.88, 0.26)
+	var t: Tween = UiMotion.tween(self)
+	if t == null:
+		# No frames will pass, so the toast stays up. A test asserting on toast_text() then
+		# reads what the player would have seen, rather than an empty string it cannot explain.
+		_toast_box.visible = true
+		return
+	t.tween_interval(TOAST_HOLD)
+	t.tween_callback(func() -> void: UiMotion.fade_out(_toast_box, 0.3))
+	UiMotion.replace(_tweens, _toast_box, t)
 
 
 ## Announce a reward. This is the payoff moment of a collection game, so it gets a real
@@ -325,9 +397,12 @@ func build_tools(icons: Array[UiTheme.Glyph.Kind]) -> void:
 		var column: VBoxContainer = VBoxContainer.new()
 		column.add_theme_constant_override("separation", 4)
 		column.alignment = BoxContainer.ALIGNMENT_CENTER
-		column.add_child(slot)
+		# Shelled for the same reason as a stat row: a slot parented straight to this VBox
+		# cannot be scaled, so any acknowledgement of selecting it has to be colour alone.
+		column.add_child(UiMotion.transform_shell(slot))
 		column.add_child(badge)
 		_toolbar.add_child(column)
+		_make_click_through(column)
 		_tool_slots.append(slot)
 
 
@@ -335,6 +410,74 @@ func set_active_tool(index: int) -> void:
 	_ensure_built()
 	for i: int in range(_tool_slots.size()):
 		_tool_slots[i].add_theme_stylebox_override("panel", UiTheme.slot_box(i == index))
+
+
+# ------------------------------------------------------------------------------ read-back
+
+## Everything the HUD is currently showing, as strings.
+##
+## These exist so a test can assert `hud.prompt_text() == "to open"` instead of
+## `hud.find_child("PromptLabel", true, false).text`. The find_child version couples every
+## test to this file's private build order — rename a node here and a dozen assertions
+## elsewhere fail with a null dereference rather than a message. A write-only UI is a UI that
+## can only be checked by screenshot, which is exactly the kind of check that stops running.
+
+## What the stat currently reads, or "" for an unknown id.
+func stat_text(id: StringName) -> String:
+	_ensure_built()
+	var entry: Dictionary = _stats.get(id, {}) as Dictionary
+	return "" if entry.is_empty() else (entry["value"] as Label).text
+
+
+## The BODY of the prompt, without the keycap — "to open" for "Press [E] to open". "" when the
+## prompt is hidden, so this doubles as the visibility check.
+func prompt_text() -> String:
+	_ensure_built()
+	if _prompt_box == null or not _prompt_box.visible:
+		return ""
+	return _prompt_label.text
+
+
+## The key inside the prompt's chip ("E"), or "" when the prompt is a status rather than an
+## action. Distinguishing those two is the whole point of set_prompt's parsing.
+func prompt_key() -> String:
+	_ensure_built()
+	if _key_chip == null or not _key_chip.visible or not _prompt_box.visible:
+		return ""
+	return _key_label.text
+
+
+func held_text() -> String:
+	_ensure_built()
+	return "" if _held_box == null or not _held_box.visible else _held_label.text
+
+
+func hint_text() -> String:
+	_ensure_built()
+	return "" if _hint == null or not _hint.visible else _hint.text
+
+
+## The counter as displayed, mid-roll included — "3/8". Assert against this only with motion
+## disabled or after the roll has finished; that is a property of counting up, not a flaw.
+func counter_text() -> String:
+	_ensure_built()
+	return "" if _counter == null else _counter.text
+
+
+## The title on the reward card currently showing, or "" when none is.
+func card_title() -> String:
+	_ensure_built()
+	return "" if _card == null or not _card.visible else _card_title.text
+
+
+func toast_text() -> String:
+	_ensure_built()
+	return "" if _toast_box == null or not _toast_box.visible else _toast_label.text
+
+
+func crosshair_state() -> Cross:
+	_ensure_built()
+	return _cross_state
 
 
 ## A CanvasLayer has no rect of its own, so `hud.size` does not exist. Anything asserting
@@ -410,8 +553,28 @@ func _build() -> void:
 	add_child(_root)
 
 	_build_top_left()
+	_build_top_right()
 	_build_centre()
 	_build_bottom()
+	_make_click_through(_root)
+
+
+## Force every Control under `n` to MOUSE_FILTER_IGNORE.
+##
+## Done as a sweep rather than a line per node because the defect it prevents is a class, not
+## an instance: Panel, PanelContainer and Button default to STOP, so every future addition to
+## this file is one forgotten line away from eating the mouse. In a captured-cursor game the
+## symptom is that the player cannot look around, and the cost of finding that is an hour with
+## a camera controller that turns out to be correct.
+##
+## If you add something the player must actually click — a HUD-embedded button — give it
+## MOUSE_FILTER_STOP after this runs, and be deliberate about it.
+func _make_click_through(n: Node) -> void:
+	var c: Control = n as Control
+	if c != null:
+		c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for child: Node in n.get_children():
+		_make_click_through(child)
 
 
 func _build_top_left() -> void:
@@ -447,6 +610,25 @@ func _build_top_left() -> void:
 	_hint.name = "HintLabel"
 	_hint.visible = false
 	col.add_child(_hint)
+
+
+## The toast lives opposite the stat stack, on the diagonal from it: the top-right corner is
+## the one place a transient line can appear without covering the crosshair, the prompt, the
+## held item or the counter, all of which the player may be reading at the time.
+func _build_top_right() -> void:
+	_toast_box = PanelContainer.new()
+	_toast_box.name = "ToastBox"
+	_toast_box.set_anchors_and_offsets_preset(
+		Control.PRESET_TOP_RIGHT, Control.PRESET_MODE_MINSIZE, int(UiTheme.MARGIN))
+	# Grows leftward as the text gets longer, so the right edge stays put against the margin.
+	_toast_box.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_toast_box.add_theme_stylebox_override("panel", UiTheme.pill_box())
+	_toast_box.visible = false
+	_root.add_child(_toast_box)
+
+	_toast_label = UiTheme.make_label("", UiTheme.FS_BODY, UiTheme.ACCENT, false)
+	_toast_label.name = "ToastLabel"
+	_toast_box.add_child(_toast_label)
 
 
 func _build_centre() -> void:
@@ -615,7 +797,12 @@ func _build_bottom() -> void:
 
 	_counter = UiTheme.make_label("0/0", UiTheme.FS_HUGE, UiTheme.TEXT, false)
 	_counter.name = "CarryCounter"
-	_counter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_counter.size_flags_vertical = Control.SIZE_SHRINK_END
 	_counter.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	bar.add_child(_counter)
+	# Shelled so count_to's end-of-roll punch has something it is allowed to scale, and hung at
+	# the END of the bar rather than expanding: the toolbar already takes all the slack, so
+	# shrink-end puts the counter hard against the right margin and a number that grows a digit
+	# extends leftward instead of shifting the whole readout.
+	_counter_shell = UiMotion.transform_shell(_counter)
+	_counter_shell.size_flags_horizontal = Control.SIZE_SHRINK_END
+	_counter_shell.size_flags_vertical = Control.SIZE_SHRINK_END
+	bar.add_child(_counter_shell)
