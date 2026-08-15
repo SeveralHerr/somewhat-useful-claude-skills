@@ -19,6 +19,7 @@ python skills/kenney-asset-kit/scripts/kenney_probe.py "<kit dir>" [--json]
 python skills/kenney-asset-kit/scripts/kenney_probe2d.py "<2D pack dir>" [--check FILE] [--json]
 python skills/blender-mcp-modelling/scripts/style_probe.py "<ref dir>" [--check FILE] [--json]
 python skills/godot-game-ui/scripts/scaffold_ui.py <godot project> [--only theme,hud] [--dest ui] [--force]
+python skills/godot-game-ui/scripts/palette_lint.py [<dir with ui_theme.gd>] [--json]   # default: the templates
 python skills/godot-game-ui-juicy/scripts/scaffold_juicy_ui.py <godot project>
 python skills/itch-store-page/scripts/store_art.py palette|cover|banner --src shot.png
 ```
@@ -81,8 +82,24 @@ subdirectories are pulled in only when needed:
   there. They are a starting point, not a library, and are commented with *why*.
 - `references/` — read on demand while adapting.
 
-**The two UI skills share files byte-for-byte.** `ui_theme.gd`, `ui_motion.gd` and
-`smoke_test.gd` are identical copies in `godot-game-ui` and `godot-game-ui-juicy`; `hud.gd`,
+**`palette_lint.py` is the only check that can see a hard-coded colour.** Against the shipped
+palette, `Color(0.06, 0.05, 0.07, 1.0)` is *numerically identical* to the constant it should
+have read, so a Godot test that walks the built tree reads the same `ColorRect.color` either
+way and cannot distinguish "reads `UiTheme.BACKDROP`" from "retyped its value". The difference
+exists only in the source, which is why this one is a Python lint and not an assertion in
+`smoke_test.gd`. Three rules: no chromatic literal outside `ui_theme.gd`; no literal anywhere
+repeating a palette constant's RGB; no chromatic literal in `ui_theme.gd` *below* the PALETTE
+block, since `--palette` substitutes the sixteen constants and nothing else — that third rule
+is the one that caught `style_button`, `slot_box` and `badge_box` keeping their fills as
+literals, which put `clinical` at 1.41:1 text-on-button contrast. Achromatic literals
+(`r == g == b`) are exempt by rule rather than by allowlist: a drop shadow, the white flash and
+a luminance-picked ink stay correct under every palette. Run it over a scaffolded project's
+`scripts/ui` too — the rules are the same there, which is what makes it a user tool rather than
+a repo-only lint.
+
+**The two UI skills share files byte-for-byte.** `ui_theme.gd`, `ui_motion.gd`,
+`smoke_test.gd` and `palette_lint.py` are identical copies in `godot-game-ui` and
+`godot-game-ui-juicy`; `hud.gd`,
 `pause_menu.gd`, `title_screen.gd` and `results_screen.gd` have diverged (juicy is the animated
 superset, and adds `ui_juice.gd`). There is no shared source — a fix to a shared file must be
 applied to both copies, and the two scaffolders' `PIECES` dependency tables kept parallel.
@@ -127,11 +144,16 @@ Tuning the skill's output means editing the wordlists, not the script.
   which only resolves for a loose install and not under the plugin cache. The only remaining
   mention of that path is in `skill-feedback-issue`, where it is deliberate — it is describing
   loose installs.
-- A change to a `.gd` template is not done until both smoke tests and `juice_test.gd` pass, and
-  a new assertion is not done until it has been shown to FAIL against the defect it describes.
+- A change to a `.gd` template is not done until both smoke tests, `juice_test.gd` and
+  `palette_lint.py` pass, and a new assertion is not done until it has been shown to FAIL
+  against the defect it describes.
   Mutate the scaffolded copy in the throwaway project (never the repo), run, and re-scaffold to
   restore. Three assertions written here initially passed against the bug they were meant to
   catch — one was measuring a Container that is stretched regardless of its own alignment.
+  A check also is not done until its *exemptions* have been shown to stay quiet: `palette_lint`
+  was proved on three injected leaks and then separately proved silent on the achromatic shapes
+  and the `# palette-lint: ignore` pragma. A check that fires correctly but also fires on
+  legitimate code gets switched off within a week, which costs more than never shipping it.
 - The Godot kit is deliberately asset-free: no `.png`, `.ttf`, `.tres` or `.tscn` — colours come
   from one theme file and icons are drawn in `_draw()`. Eval assertions enforce this.
 - `.gitattributes` forces LF; keep scripts POSIX-shebanged and path-agnostic (they run on Windows

@@ -22,7 +22,7 @@
       "expected_output": "A themed UI with a coherent dark-fantasy palette, styled panels and readable text over gameplay.",
       "assertions": [
         "The project compiles under Godot 4.7: an --import pass produces no SCRIPT ERROR, Parse Error, Failed to load script or Compilation failed.",
-        "Colours are defined once in a single central theme/palette location rather than scattered as literals across screen scripts.",
+        "Colours are defined once in a single central theme/palette location rather than scattered as literals across screen scripts. Judge this the way scripts/palette_lint.py does: no Color(...) literal with a hue outside the theme file, and no literal anywhere that merely repeats a palette constant's value - both render correctly today and survive a re-skin, which is the defect. Achromatic literals (black, white, grey) are fine.",
         "The palette matches the brief: deep purples and a bone-white text colour.",
         "Panels use StyleBoxFlat with corner radii and borders rather than Godot's default grey Panel styling.",
         "HUD text is given BOTH a font outline and a drop shadow, so it stays readable over arbitrary gameplay.",

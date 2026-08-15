@@ -30,7 +30,11 @@ cp <skill dir>/assets/smoke_test.gd <project>/smoke_test.gd
 cp <skill dir>/assets/juice_test.gd <project>/juice_test.gd
 godot --headless --path <project> --script res://smoke_test.gd   # SMOKE: ALL PASS
 godot --headless --path <project> --script res://juice_test.gd   # JUICE: ALL PASS
+python <skill dir>/scripts/palette_lint.py <project>/scripts/ui  # PALETTE: OK
 ```
+
+Those two Godot tests cannot see a hard-coded colour and the third one is why — see
+[Re-skinning is checkable](#re-skinning-is-checkable-and-a-godot-test-cannot-do-it) below.
 
 **Pick `--palette` from the game's tone, as part of installing — not as a later polish
 step.** `references/palettes.md` carries six: `amber` (warm, lamplit, collecting),
@@ -271,6 +275,48 @@ integrators wired that to `get_tree().quit()`, and the button labelled *quit to 
 the game. If you are upgrading a project that connected `pause.quit_requested`, that is the
 one call site to change.
 
+## Re-skinning is checkable, and a Godot test cannot do it
+
+Against the palette that shipped, `Color(0.06, 0.05, 0.07, 1.0)` is numerically identical to
+the constant it should have read. A test that walks the built tree reads the same
+`ColorRect.color` whether the screen referenced `UiTheme.BACKDROP` or retyped its value, so
+neither `smoke_test.gd` nor `juice_test.gd` can tell a re-skinnable UI from one that merely
+looks right today. The difference exists only in the source:
+
+```bash
+python <skill dir>/scripts/palette_lint.py <project>/scripts/ui
+```
+
+It exits 1 naming every `Color(...)` literal a palette change would not reach, in your screens
+as well as the kit's. Run it after adding a screen of your own — that is when literals appear,
+and a hard-coded colour looks correct right up until someone picks a different `--palette`, at
+which point the palette gets blamed for the leak.
+
+What it caught last was not a screen retyping the accent: it was `ui_theme.gd` itself keeping
+the button, slot and badge fills as literals in its own function bodies, below the block a
+palette substitutes. Under the light-panelled `clinical` palette that rendered near-black text
+on a near-black button — 1.41:1 contrast, against 4.5:1 for legible.
+
+Black, white and greys are exempt, because a drop shadow, the white screen flash and a
+luminance-picked ink are not palette choices and stay correct under every palette. A colour
+with a hue is not. Anything that genuinely must be a literal takes `# palette-lint: ignore`
+on its line.
+
+### Write a headless harness in the shape the shipped tests use
+
+A screen builds its children in `_ready`. The obvious harness — a `SceneTree` script whose
+`_init()` news a screen up and calls `add_child(...)` — observes it before any of that has
+run, walks an empty `Control`, and reports ALL PASS having asserted nothing. It is
+indistinguishable from a real pass. Copy the shape from `assets/smoke_test.gd`: `_initialize()`
+rather than `_init()`, `root` rather than `get_root()`, and return `false` from `_process` for
+about three frames so `_ready` and the first layout pass have both happened. Then break the
+thing you are checking and watch the assertion go red — an assertion that has never failed has
+not been tested.
+
+Reading a colour back has its own trap: `Label.get_theme_color_override()` does not exist and
+dies with `Invalid call. Nonexistent function`. The call that resolves an override is
+`label.get_theme_color(&"font_color")`.
+
 ## Reference
 
 `references/motion.md` — the timing and curve reference: which `TRANS_` to pick for which
@@ -280,6 +326,10 @@ or writing your own animated component.
 
 `references/palettes.md` — six ready-made palettes plus the two contrast pairs that break
 when a palette is written by hand. `--palette` reads this file at scaffold time.
+
+`scripts/palette_lint.py` — run over `assets/templates/` by default, or over a project's
+`scripts/ui`. Names every colour a re-skin cannot reach; see the section above for why this
+cannot be a Godot test.
 
 `assets/templates/` — the installable files. `ui_juice.gd` is the one worth reading in full;
 it is commented with the reasoning rather than the mechanics.

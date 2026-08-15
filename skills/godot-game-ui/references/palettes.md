@@ -13,6 +13,12 @@ Every colour a screen uses is derived from these sixteen constants, so this file
 art direction. `BACKDROP_OPAQUE` is deliberately absent: it is derived from `BACKDROP` in the
 template and must stay that way.
 
+That sentence was aspirational for two releases. `scripts/palette_lint.py` is what makes it a
+fact — it exits 1 on any colour a palette swap cannot reach, and the last thing it caught was
+`ui_theme.gd`'s own button, slot and badge fills sitting as literals below this block, which
+left `clinical` rendering near-black text on a near-black button. Run it after editing a
+palette or adding a screen.
+
 ## How to read a palette
 
 Two of these pairs are load-bearing and are the ones people get wrong when hand-rolling a new

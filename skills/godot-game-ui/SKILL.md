@@ -71,6 +71,15 @@ puzzler differ by exactly sixteen constants — which is why `references/palette
 a whole art direction as a code block, and why `--palette` can swap one in at scaffold time
 by substituting sixteen lines.
 
+The rule is enforced rather than encouraged: `scripts/palette_lint.py` exits 1 on any colour
+outside that block, in the kit's files and in yours. It exists because this idea failed
+silently for two releases — a hard-coded colour looks *right* until someone re-skins, and by
+then it is the palette that gets blamed. Note what it caught last: not screens retyping the
+accent, but `ui_theme.gd` itself keeping the button, slot and badge fills as literals in its
+own function bodies, below the block a palette substitutes. The file that owns the rule was
+the file breaking it, and under the light-panelled `clinical` palette that put near-black text
+on a near-black button at 1.41:1 contrast.
+
 ### 2. Every label gets an outline *and* a shadow
 
 Game UI sits over an unpredictable, often bright, often moving background. This is the
@@ -345,6 +354,45 @@ assertions worth writing — they catch the failures that are invisible in the f
 - text is correct after calling a setter, with zero frames pumped (catches the tween-callback
   trap from idea 5 — this is the one that matters most)
 
+### Write the harness in the shape `smoke_test.gd` uses, or it passes without looking
+
+A screen builds its children in `_ready`. The obvious harness — a `SceneTree` script with
+`_init()` that news a screen up and calls `add_child(...)` — observes it **before** any of
+that has run, so it walks an empty `Control`, finds nothing to assert against, and reports
+ALL PASS. It is not a flaky test; it is a test of nothing, and it is indistinguishable from
+a passing one. This has already cost a debugging detour here: a check written that way passed
+against templates deliberately reverted to the buggy version.
+
+Three things make the difference, all of them visible in `assets/smoke_test.gd`:
+
+- `func _initialize()`, not `_init()` — `_initialize` runs after the tree exists
+- `root`, not `get_root()`
+- return `false` from `_process` for about three frames before asserting, so `_ready` and the
+  first layout pass have both happened
+
+Then confirm the harness can fail: break the thing you are checking, watch the assertion go
+red, put it back. An assertion that has never failed has not been tested either.
+
+Reading a colour back has its own trap: `Label.get_theme_color_override()` does not exist and
+dies at runtime with `Invalid call. Nonexistent function`. The call that resolves an override
+is `label.get_theme_color(&"font_color")`.
+
+### What a runtime assertion cannot see: a hard-coded colour
+
+Against the palette that shipped, `Color(0.06, 0.05, 0.07, 1.0)` is numerically identical to
+the constant it should have read, so a test that walks the built tree reads the same
+`ColorRect.color` whether the screen referenced `UiTheme.BACKDROP` or retyped its value. The
+two only differ in the source, which is where the check has to be:
+
+```bash
+python <skill dir>/scripts/palette_lint.py <project>/scripts/ui
+```
+
+It exits 1 naming every `Color(...)` literal a palette change would not reach — in your
+screens as well as the kit's. Run it after adding a screen of your own; that is when the
+literals appear. Four shipped in this kit at once for exactly this reason, and the scaffolder
+went on telling everyone the palette was the whole art direction the entire time.
+
 ## Verifying an install
 
 `assets/smoke_test.gd` exercises the whole kit headlessly — it configures a HUD in the same
@@ -355,6 +403,7 @@ verifies the pause menu's buttons are `PROCESS_MODE_ALWAYS` and its signals fire
 ```bash
 cp <skill dir>/assets/smoke_test.gd <project>/smoke_test.gd
 godot --headless --path <project> --script res://smoke_test.gd    # prints SMOKE: ALL PASS
+python <skill dir>/scripts/palette_lint.py <project>/scripts/ui   # prints PALETTE: OK
 ```
 
 Worth running once after scaffolding into a new project or after a Godot version bump —
@@ -370,6 +419,12 @@ scaffolding, or when a piece needs to behave differently from the template.
 
 `references/palettes.md` — six ready-made palettes plus the two contrast pairs that break
 when a palette is written by hand. `--palette` reads this file at scaffold time.
+
+`scripts/palette_lint.py` — run over `assets/templates/` by default, or over a project's
+`scripts/ui`. Names every colour a re-skin cannot reach. Anything that genuinely must be a
+literal takes `# palette-lint: ignore` on its line; black, white and greys are exempt already,
+since a drop shadow or a luminance-picked ink is not a palette choice and stays correct under
+every palette. A colour with a hue is not.
 
 `assets/templates/` — the installable files themselves. Read the one you are adapting;
 they are commented with the reasoning, not just the what.

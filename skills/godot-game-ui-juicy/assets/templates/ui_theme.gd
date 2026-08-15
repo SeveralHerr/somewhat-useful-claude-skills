@@ -236,7 +236,14 @@ static func circle_box(
 ## highlight disappears the moment the player is looking at the middle of the screen.
 static func slot_box(active: bool) -> StyleBoxFlat:
 	var box: StyleBoxFlat = StyleBoxFlat.new()
-	box.bg_color = Color(0.09, 0.07, 0.09, 0.80) if active else Color(0.05, 0.04, 0.06, 0.62)
+	# Both fills are PANEL_FILL, because a slot is a socket cut into a panel and has to stay
+	# related to it under every palette. The active one is the same colour lifted slightly:
+	# written as its own literal it used to survive a re-skin and leave a warm slot sitting
+	# in a cold UI.
+	box.bg_color = (
+		with_alpha(PANEL_FILL.lightened(0.04), 0.80) if active
+		else with_alpha(PANEL_FILL, 0.62)
+	)
 	box.set_corner_radius_all(14)
 	box.set_border_width_all(2 if active else 1)
 	box.border_color = ACCENT if active else PANEL_BORDER
@@ -249,7 +256,7 @@ static func slot_box(active: bool) -> StyleBoxFlat:
 
 static func badge_box(active: bool) -> StyleBoxFlat:
 	var box: StyleBoxFlat = StyleBoxFlat.new()
-	box.bg_color = ACCENT if active else Color(0.10, 0.09, 0.11, 0.88)
+	box.bg_color = ACCENT if active else PANEL_FILL_DEEP.lightened(0.04)
 	box.set_corner_radius_all(5)
 	box.set_content_margin_all(1.0)
 	box.content_margin_left = 6.0
@@ -306,15 +313,26 @@ static func style_label(
 static func style_button(b: Button, primary: bool = false, min_width: float = 320.0) -> void:
 	if b == null:
 		return
-	var base: Color = Color(0.20, 0.19, 0.22, 0.95)
-	var hover: Color = Color(0.28, 0.26, 0.30, 1.0)
-	var press: Color = Color(0.16, 0.15, 0.18, 1.0)
+	# A secondary button is a panel you can press, so it is PANEL_FILL_DEEP lifted far enough
+	# to read as raised. Deriving it matters more here than anywhere else in this file: these
+	# were literals, and a light-panelled palette like `clinical` pairs its near-black TEXT
+	# with them, which rendered dark ink on a dark button — the whole shell unreadable, from
+	# three numbers a re-skin could not reach.
+	var base: Color = with_alpha(PANEL_FILL_DEEP.lightened(0.15), 0.95)
+	# Hover and press go fully opaque: the control the pointer is on should stop being a
+	# translucent overlay and commit to being a button.
+	var hover: Color = with_alpha(base.lightened(0.14), 1.0)
+	var press: Color = with_alpha(base.darkened(0.14), 1.0)
 	var ink: Color = TEXT
 	if primary:
 		base = ACCENT
 		hover = ACCENT.lightened(0.14)
 		press = ACCENT.darkened(0.14)
-		ink = Color(0.14, 0.10, 0.04)
+		# The primary button is the one place TEXT is the wrong ink — it is chosen to read
+		# against panels, not against the accent. Luminance rather than HSV value, because
+		# value ignores how much each channel actually contributes: a saturated red at v=0.85
+		# is dark to the eye and wants light ink, and `bloodmoon` is exactly that palette.
+		ink = ACCENT.darkened(0.86) if ACCENT.get_luminance() > 0.4 else ACCENT.lightened(0.9)
 	b.add_theme_stylebox_override("normal", button_box(base))
 	b.add_theme_stylebox_override("hover", button_box(hover))
 	b.add_theme_stylebox_override("pressed", button_box(press))
