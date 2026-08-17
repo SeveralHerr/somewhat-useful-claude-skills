@@ -108,6 +108,17 @@ def add_scrim(im, side, strength=185):
     im.alpha_composite(scrim)
 
 
+def fit_text(text, px, fill, outline, font_path, max_w):
+    """pixel_text at the largest size <= px whose strip is no wider than max_w."""
+    strip = pixel_text(text, px, fill, outline, font_path)
+    while strip.width > max_w and px > 12:
+        px = max(12, int(px * 0.9))
+        strip = pixel_text(text, px, fill, outline, font_path)
+    if strip.width > max_w:
+        print(f"WARN: '{text}' still {strip.width}px wide at the minimum size; it will clip", file=sys.stderr)
+    return strip
+
+
 def build(args, target, default_scrim, title_px, sub_px):
     src = Image.open(args.src).convert("RGB")
     focus = tuple(int(v) for v in args.focus.split(",")) if args.focus else None
@@ -120,11 +131,16 @@ def build(args, target, default_scrim, title_px, sub_px):
         font = args.font or find_font()
         fill = (255, 226, 138, 255)
         parts = []
+        # Fit to width: a title px is a ceiling, not a size. "PEST CONTROL" at the
+        # cover's default 96px is wider than the 630px cover and both ends were cut
+        # off, silently - nothing errors on an overflowing composite. Step the size
+        # down (in the pixel grid's steps) until the rendered strip fits with margin.
+        max_w = target[0] - 2 * (54 if side == "left" else 20)
         if args.title:
-            parts.append(pixel_text(args.title, title_px, fill, (28, 22, 14, 255), font))
+            parts.append(fit_text(args.title, title_px, fill, (28, 22, 14, 255), font, max_w))
         if args.subtitle:
             parts.append(
-                pixel_text(args.subtitle, sub_px, (206, 236, 255, 255), (22, 32, 48, 255), font)
+                fit_text(args.subtitle, sub_px, (206, 236, 255, 255), (22, 32, 48, 255), font, max_w)
             )
         total = sum(p.height for p in parts) + (10 if len(parts) > 1 else 0)
         if side == "left":
