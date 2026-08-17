@@ -42,6 +42,8 @@ Find `<id>` from `itch.io/dashboard`: each project's Edit link is `/game/edit/<i
    what is already filled in, which matters because some fields are the user's own prior
    decisions and are not yours to change (see Boundaries).
 3. Fill copy, genre, tags. Save. Verify by reload, not by the absence of an error.
+   Description, genre and tags all need hand-written JS rather than `form_input` — see
+   Field reference, and do that before you decide the page is broken.
 4. Generate art from real gameplay screenshots (see below), upload it.
 5. Open the theme editor, set colours from the game's own palette, set screenshot
    placement, save. Verify by reload.
@@ -111,7 +113,67 @@ Edit form:
 | Tagline | `input[name="game[short_text]"]` — **max 120 chars**, save rejects 121 |
 | Cover id | `input[name="game[cover_image_id]"]` |
 | Screenshots | `input[name^="screenshot["]` → `screenshot[<id>][position]` |
-| Description | `.redactor` contenteditable — click into it and type |
+| Description | the Redactor contenteditable — set it **and** mirror it into `textarea[name="game[description]"]` (below) |
+| Genre | `select[name="game[genre]"]` — a Selectize control: `el.selectize.setValue('strategy')` (below) |
+| Tags | `input[name="game[tags]"]` — Selectize too: `el.selectize.createItem('plants')` (below) |
+
+Those last three are not ordinary form fields, and `form_input` drives none of them.
+
+### "My description vanished when I saved"
+
+The symptom is not a failed save. The text is visibly in the editor, the save succeeds,
+and the page comes back with the description field **empty** — including whatever was
+there before you started.
+
+What gets posted is the hidden `textarea[name="game[description]"]`; the visible editor is
+Redactor writing into it from its own key handling, and synthetic input never reaches that
+path. Setting `innerHTML` and dispatching `input`/`keyup` — and a real keypress driven
+through the browser — all left the textarea at length 0. Saving then posts the empty
+string, which reads as deletion rather than as nothing happening.
+
+So write both halves, and read the textarea back before you press Save:
+
+```js
+const ta = document.querySelector('textarea[name="game[description]"]');
+const ed = document.querySelector('.redactor-in')                 // seen on this form
+        || document.querySelector('.redactor-layer')              // seen on the devlog form
+        || ta.parentElement.querySelector('[contenteditable="true"]');
+ed.innerHTML = html;
+ta.value = ed.innerHTML;      // the half that is actually submitted
+ta.value.length               // must be non-zero, or Save wipes the field
+```
+
+Resolve that element instead of trusting a remembered class. This table used to say
+`.redactor`, which as a CSS selector matches neither `redactor-in` nor `redactor-layer` —
+class selectors match whole tokens, not prefixes — so the old advice was at best a
+shorthand and at worst was querying nothing. `.redactor-in` is what a live read of the
+edit form returned on 2026-08-17; treat a `null` here as the bug, not the sync.
+
+### "The genre dropdown only has one option" / "my tag didn't stick"
+
+Genre and Tags are Selectize widgets. The underlying `<select>`/`<input>` keeps a single
+placeholder (`none|No genre`) while the real option list, the current value and every
+listener live on a JS instance hung off the element. Two consequences:
+
+- reading `[...el.options]` reports one option, which looks like a page that failed to
+  load its genres. `el.selectize.options` is the actual list.
+- `form_input` — and anything else that sets `.value` and fires `change` — writes to an
+  element nobody reads. No error, the visible control does not move, and the save keeps
+  the old value.
+
+Drive the instance:
+
+```js
+document.querySelector('select[name="game[genre]"]').selectize.setValue('strategy');
+const tags = document.querySelector('input[name="game[tags]"]').selectize;
+tags.addItem('strategy');    // existing options only
+tags.createItem('plants');   // custom tag: creates the option, then selects it
+```
+
+`addItem` with a tag itch has never seen is a silent no-op — that is the "my tag didn't
+stick" symptom, with no chip added and nothing saved. Values are slugs, so read
+`Object.keys(tags.options)` for the exact spelling rather than guessing at capitalisation,
+and read `el.selectize.getValue()` back afterwards.
 
 Theme editor:
 
@@ -173,6 +235,10 @@ background — palette mid-tones are usually too dim and need lightening.
   image while the hidden id stays empty. Read the id field, then reload.
 - **Do not infer success from something appearing.** If a cover shows up that you did not
   put there, check what it actually depicts before claiming your upload worked.
+- **Screenshots of the edit page are not a reliable read.** Captures there came back blank
+  or timed out at 30s often enough to mislead — a blank frame looks like an empty form and
+  invites you to re-do work that already landed. Verify with JS reads of the actual field
+  values (and a reload) and keep screenshots for the rendered public page.
 
 ## Boundaries
 

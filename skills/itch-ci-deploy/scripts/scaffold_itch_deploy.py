@@ -26,6 +26,10 @@ CI run fails after eight minutes of downloading templates:
   - the renderer. Web builds run only on the Compatibility renderer;
     `rendering/renderer/rendering_method.web` defaults to gl_compatibility and is checked
     in case someone overrode it.
+  - the target's game slug against the repo directory name. The slug is whatever was typed
+    into itch's "create a new project" form - usually the game's title - and a slug that is
+    just the folder name is the shape of a guess. It is a WARN, never a FAIL: a guess is
+    often right, and the only way to be sure is to read the dashboard.
 
 Exit 0 = wrote (or --check found nothing wrong); 1 = a finding that would break the
 first run; 2 = could not run (not a Godot project, template missing). It prints what it
@@ -137,6 +141,29 @@ def parse_presets(text: str):
         else:
             presets[idx][key.strip()] = val
     return presets
+
+
+def slugify(s: str) -> str:
+    """Reduce a directory name or a human title to the slug itch would have been given.
+
+    itch slugs are lowercase `[a-z0-9-]`, so "Pest Control" and "pest_control" and
+    "Pest  Control!" all reduce to `pest-control`. Comparing the *slugified* forms is what
+    keeps the warning below quiet for the common, correct case where the folder, the title
+    and the slug are all the same word.
+    """
+    return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
+
+
+def display_name(text: str):
+    """`application/config/name` out of project.godot, or None if absent.
+
+    Anchored so `config/name_localized` (a Dictionary, not a title) cannot match.
+    """
+    m = re.search(r'^\s*config/name\s*=\s*"([^"]*)"', text, re.M)
+    if not m:
+        return None
+    name = m.group(1).strip()
+    return name or None
 
 
 def gitignore_ignores(project: Path, needle: str) -> bool:
@@ -270,6 +297,27 @@ def main():
     if args.target:
         if re.fullmatch(r"[a-z0-9_-]+/[a-z0-9_-]+:[a-z0-9_-]+", args.target):
             rep.ok(f"butler target {args.target}")
+            # Is the game slug a guess off the folder name? butler cannot tell you: a slug
+            # that does not exist fails at the very last step with
+            # `itch.io API error (400): /wharf/builds: invalid game`, ten minutes in.
+            # Warn only when the slug is *exactly* the directory name AND the project calls
+            # itself something else - i.e. there was a title available and it was not used.
+            # A slug matching the title, matching both, or matching neither (someone who
+            # read their dashboard) is silent, and so is a project with no config/name.
+            slug = args.target.partition("/")[2].partition(":")[0]
+            dir_slug = slugify(project.name)
+            title = display_name(text)
+            title_slug = slugify(title) if title else None
+            if dir_slug and slug == dir_slug and title_slug and title_slug != slug:
+                rep.warn(
+                    f"game slug {slug!r} is the project folder's name, but the project calls "
+                    f"itself {title!r} (slug {title_slug!r}). An itch slug is whatever was "
+                    "typed when the page was created - usually the title, not the repo folder "
+                    "- and a wrong one fails only at the butler step, with "
+                    "'itch.io API error (400): /wharf/builds: invalid game'. Read the real "
+                    "slug off https://itch.io/dashboard (the URL beside each project's Edit "
+                    f"link) before pushing; if {slug!r} is right, ignore this."
+                )
         else:
             rep.fail(f"--target {args.target!r} must look like user/game:channel (lowercase itch slugs)")
 
@@ -317,10 +365,13 @@ def main():
     print(f"""
 One-time setup that no workflow can do for you:
   1. Repository secret BUTLER_API_KEY  (GitHub: Settings -> Secrets and variables -> Actions)
-     Generate it at https://itch.io/user/settings/api-keys, then:
-       gh secret set BUTLER_API_KEY --repo <owner/repo>
+     Generate it at https://itch.io/user/settings/api-keys, then pass the key on the command
+     line - a bare `gh secret set` with no terminal reads EOF and stores an EMPTY secret,
+     which butler reports exactly like a missing one:
+       gh secret set BUTLER_API_KEY --repo <owner/repo> --body "$KEY"
   2. The itch.io project must already exist at https://{user}.itch.io/{game}
-     (butler creates the '{channel}' channel on the first push, never the game).
+     (butler creates the '{channel}' channel on the first push, never the game). Open that
+     URL: a 404 means the slug is wrong, and butler will not say so until the last step.
   3. After the first successful push, on the itch.io Edit game page set Kind of project
      = HTML and tick "This file will be played in the browser" on the {channel} upload.
      butler cannot set either; the build is invisible to players until you do.

@@ -306,6 +306,16 @@ This kit shipped with `ResultsScreen.heading` configurable while the two buttons
 it were not, which is how you end up with a deadpan-clinical end screen politely offering
 "Play again".
 
+**Anything the game might not be able to honour is gated by an export, sliders included.**
+`PauseMenu` has `show_restart`, `show_quit_to_desktop`, `show_sensitivity` and
+`show_volume`. The two sliders default to on because most games want them, but a kit cannot
+know whether yours has camera look or an audio bus — and this one shipped building both
+unconditionally, so a game that never connected `sensitivity_changed` put a slider in front
+of the player that drags smoothly and changes nothing. That reads as a broken menu rather
+than as a feature the game does not have, which is strictly worse than the control being
+absent. Turning one off leaves its private field null; `set_values()` already null-checks
+both, so the off state costs no other edit.
+
 **Set `pivot_offset` from the current size on every punch**, not once at `_ready`. A Control
 inside a container is resized after `_ready`, and a stale pivot makes the scale visibly
 swing from a corner.

@@ -269,6 +269,15 @@ is the most common misuse.
 `show_quit_to_desktop = true`. `ResultsScreen` emits `again_requested` and `menu_requested`;
 `TitleScreen` emits `play_requested` and `quit_requested`.
 
+Everything optional in that menu is gated by an export: `show_restart`,
+`show_quit_to_desktop`, `show_sensitivity`, `show_volume`. The two sliders default to on,
+but a game with no camera-look system or no audio bus should switch them off rather than
+leave the signal unconnected — this kit shipped building both unconditionally, and a slider
+that drags smoothly and changes nothing reads as a broken menu rather than as a feature the
+game does not have. Nothing else needs changing when you do: `set_values()` null-checks both
+fields, and the entrance stagger walks whatever rows were actually built, so it simply
+animates one row fewer.
+
 `menu_requested` is the same intent on both screens on purpose, so wiring them to one handler
 is correct. Earlier versions had the pause menu's "Quit to menu" button emit `quit_requested`;
 integrators wired that to `get_tree().quit()`, and the button labelled *quit to menu* closed

@@ -51,6 +51,14 @@ signal volume_changed(value: float)
 ## run by misreading one of them.
 @export var show_quit_to_desktop: bool = false
 
+## Same idea for the two sliders. A game with no camera-look system and no audio bus used to
+## ship both of them anyway — visible, draggable, and connected to signals nobody wired — and
+## a control that does nothing reads to a player as a broken menu rather than as a feature
+## this game does not have. Both default to on, so existing projects are unaffected. Turning
+## one off leaves its field null, which is what the null checks in set_values() are for.
+@export var show_sensitivity: bool = true
+@export var show_volume: bool = true
+
 var _sensitivity: HSlider = null
 var _volume: HSlider = null
 var _root: Control = null
@@ -104,9 +112,15 @@ func _build() -> void:
 		col.add_child(UiTheme.make_label(subtitle_text, UiTheme.FS_SMALL, UiTheme.TEXT_DIM))
 
 	col.add_child(_gap(18.0))
-	_sensitivity = _slider(col, "Mouse sensitivity", 0.2, 3.0, 1.0, sensitivity_changed)
-	_volume = _slider(col, "Volume", 0.0, 1.0, 0.8, volume_changed)
-	col.add_child(_gap(18.0))
+	if show_sensitivity:
+		_sensitivity = _slider(col, "Mouse sensitivity", 0.2, 3.0, 1.0, sensitivity_changed)
+	if show_volume:
+		_volume = _slider(col, "Volume", 0.0, 1.0, 0.8, volume_changed)
+	# Only the leading gap is unconditional. With no sliders between them the two gaps stack
+	# into 36px of nothing under the title, which looks like a layout bug rather than a menu
+	# with fewer options.
+	if show_sensitivity or show_volume:
+		col.add_child(_gap(18.0))
 
 	col.add_child(_button(resume_label, resume_requested, true))
 	if show_restart:

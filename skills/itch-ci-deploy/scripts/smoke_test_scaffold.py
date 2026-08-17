@@ -89,6 +89,75 @@ def main():
         rc, out = run(Path(td), "--check")
         check("not a Godot project exits 2", rc == 2, out)
 
+    # --- the guessed-slug WARN -----------------------------------------------------
+    # The defect: a slug copied off the repo folder when the game is called something
+    # else - `plant-tower-defense/pest-control` in the report, which failed only at the
+    # butler step with `/wharf/builds: invalid game`. Everything below that is a
+    # legitimate slug and must stay silent, because a warning that fires on correct
+    # input gets ignored on the one run where it was right.
+    def slug_case(name, dirname, project_godot, target, expect_warn):
+        with tempfile.TemporaryDirectory() as td:
+            proj = Path(td) / dirname
+            proj.mkdir()
+            data = project_godot if isinstance(project_godot, bytes) else project_godot.encode("utf-8")
+            (proj / "project.godot").write_bytes(data)
+            (proj / ".gitignore").write_text(".godot/\nbin/\n", encoding="utf-8")
+            rc, out = run(proj, "--target", target, "--check")
+            warned = "is the project folder's name" in out
+            check(name, warned == expect_warn and rc in (0, 1) and "Traceback" not in out, out)
+
+    named = 'config_version=5\n\n[application]\n\nconfig/name="Pest Control"\nconfig/features=PackedStringArray("4.7")\n'
+    same = 'config_version=5\n\n[application]\n\nconfig/name="Plant Tower Defense"\nconfig/features=PackedStringArray("4.7")\n'
+    nameless = 'config_version=5\n\n[application]\n\nconfig/features=PackedStringArray("4.7")\n'
+    localized = ('config_version=5\n\n[application]\n\n'
+                 'config/name_localized={\n"en": "Pest Control"\n}\n'
+                 'config/features=PackedStringArray("4.7")\n')
+
+    slug_case("guessed slug (== dir, != slugified title) WARNs",
+              "plant-tower-defense", named, "someone/plant-tower-defense:html5", True)
+    slug_case("slug matching the slugified title is silent",
+              "plant-tower-defense", named, "someone/pest-control:html5", False)
+    slug_case("slug matching BOTH dir and slugified title is silent",
+              "pest-control", named, "someone/pest-control:html5", False)
+    slug_case("slug matching a slugified title with punctuation is silent",
+              "repo-dir", 'config_version=5\n\n[application]\n\nconfig/name="Pest  Control!"\n'
+              'config/features=PackedStringArray("4.7")\n', "someone/pest-control:html5", False)
+    slug_case("slug == dir and title slugifies to the dir name is silent",
+              "plant-tower-defense", same, "someone/plant-tower-defense:html5", False)
+    slug_case("dir name in Title Case still matches its own slug (silent)",
+              "Plant Tower Defense", same, "someone/plant-tower-defense:html5", False)
+    slug_case("no config/name is silent",
+              "plant-tower-defense", nameless, "someone/plant-tower-defense:html5", False)
+    slug_case("empty config/name is silent",
+              "plant-tower-defense",
+              'config_version=5\n\n[application]\n\nconfig/name=""\nconfig/features=PackedStringArray("4.7")\n',
+              "someone/plant-tower-defense:html5", False)
+    slug_case("config/name_localized is not a title (silent)",
+              "plant-tower-defense", localized, "someone/plant-tower-defense:html5", False)
+    slug_case("a slug that is neither the dir nor the title is silent",
+              "plant-tower-defense", named, "someone/pc-jam-build:html5", False)
+    slug_case("a malformed target is a FAIL, not a slug WARN",
+              "plant-tower-defense", named, "someone/Plant-Tower-Defense:html5", False)
+    slug_case("an unreadable project.godot is silent, not a crash",
+              "plant-tower-defense", b"\x00\xff\xfe binary junk, no [application]\x00",
+              "someone/plant-tower-defense:html5", False)
+
+    # And the WARN must not change the exit code: same project, same target, only the
+    # title differs, so any exit-code difference is the warning leaking into `findings`.
+    with tempfile.TemporaryDirectory() as td:
+        codes = {}
+        for tag, pg in (("warn", named), ("quiet", same)):
+            proj = Path(td) / tag / "plant-tower-defense"
+            proj.mkdir(parents=True)
+            (proj / "project.godot").write_text(pg, encoding="utf-8")
+            (proj / ".gitignore").write_text(".godot/\nbin/\n", encoding="utf-8")
+            rc, out = run(proj, "--target", "someone/plant-tower-defense:html5")
+            codes[tag] = (rc, (proj / ".github" / "workflows" / "deploy-to-itchio.yml").is_file(), out)
+        check("the WARN does not change the exit code",
+              codes["warn"][0] == codes["quiet"][0] == 0, codes["warn"][2])
+        check("the WARN does not block scaffolding",
+              codes["warn"][1] and "WARN  game slug" in codes["warn"][2], codes["warn"][2])
+
     if fails:
         name, out = fails[0]
         print(f"\nSMOKE: {len(fails)} FAILED; first: {name}\n{out}")

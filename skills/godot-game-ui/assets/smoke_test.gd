@@ -189,6 +189,32 @@ func _run_main_checks() -> void:
 			if fired.size() != 1 or fired[0] != "menu":
 				_fails.append("'Quit to menu' fired %s, expected only menu_requested" % [fired])
 
+	# The two sliders are optional the same way the two extra buttons are. A game with no
+	# camera-look system and no audio bus used to ship both of them anyway, visible and inert,
+	# which a player reads as a broken menu rather than as a feature this game does not have.
+	# Asserted in BOTH directions: with the defaults left alone the sliders must still be
+	# there, or "fixing" this by deleting them outright would pass just as happily.
+	var default_sliders: Array[Node] = _pause.find_children("*", "HSlider", true, false)
+	if default_sliders.size() != 2:
+		_fails.append("default pause menu built %d HSlider(s), expected 2 (sensitivity, volume)"
+			% default_sliders.size())
+	var quiet: PauseMenu = PauseMenu.new()
+	quiet.show_sensitivity = false
+	quiet.show_volume = false
+	root.add_child(quiet)
+	var quiet_sliders: Array[Node] = quiet.find_children("*", "HSlider", true, false)
+	if not quiet_sliders.is_empty():
+		_fails.append("pause menu with show_sensitivity/show_volume off still built %d HSlider(s)"
+			% quiet_sliders.size())
+	for n: Node in quiet.find_children("*", "Label", true, false):
+		var caption: String = (n as Label).text
+		if caption == "Mouse sensitivity" or caption == "Volume":
+			_fails.append("pause menu with the sliders off kept the '%s' caption" % caption)
+	# set_values() is the call a game makes as the menu opens, so a slider that was never
+	# built must not be dereferenced there — that regression would be worse than a dead control.
+	quiet.set_values(1.0, 0.5)
+	quiet.queue_free()
+
 	_res.present(
 		[{"label": "Score", "value": "1250"}, {"label": "Time", "value": "2:04"}],
 		[{"name": "Key", "found": true, "color": Color.GOLD, "tint": Color.GOLD, "tooltip": "Key"},
