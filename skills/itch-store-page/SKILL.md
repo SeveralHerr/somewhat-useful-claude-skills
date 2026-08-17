@@ -1,6 +1,6 @@
 ---
 name: itch-store-page
-description: Set up or update an itch.io game page — theme colours, description, tagline, tags, cover image, banner and screenshots — by driving the user's logged-in Chrome, plus generate store art and a palette from gameplay screenshots. Use this whenever the user mentions itch.io, their game page, store page, game cover, banner art, page theme or colours, store screenshots, or publishing/refreshing how a game build is presented — even if they never say "itch.io" outright. Also use it when they ask what an itch.io API key or butler can do, since the answer is counterintuitive and this skill has it.
+description: Set up or update an itch.io game page — theme colours, description, tagline, tags, cover image, banner and screenshots — by driving the user's logged-in Chrome, plus generate store art and a palette from gameplay screenshots. Use this whenever the user mentions itch.io, their game page, store page, game cover, banner art, page theme or colours, store screenshots, or publishing/refreshing how a game build is presented — even if they never say "itch.io" outright. Also use it when they ask what an itch.io API key or butler can do, since the answer is counterintuitive and this skill has it. For getting a build there automatically on every push, use itch-ci-deploy; this skill covers everything on the page around the build.
 ---
 
 # itch.io store pages

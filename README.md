@@ -28,6 +28,7 @@ For local development against a checkout instead of GitHub, point the marketplac
 | `godot-game-ui` | Builds polished in-game UI for Godot 4 — HUDs, pause menus, title screens, results screens, counters, prompts. Ships a Python scaffolder that installs a working UI kit into any Godot project, in one of six palettes picked from the game's tone, plus a lint that proves the palette really is the whole art direction. |
 | `godot-game-ui-juicy` | Everything `godot-game-ui` ships, plus a full motion layer: overshoot entrances, staggered rows, punching counters, shake and screen flash — with a global switch to turn it all off. |
 | `itch-store-page` | Sets up or updates an itch.io game page (theme colours, tagline, tags, cover, banner, screenshots) by driving your logged-in Chrome, and generates store art and a palette from gameplay screenshots. |
+| `itch-ci-deploy` | Sets up continuous deployment of a Godot 4 Web build to itch.io — a GitHub Actions workflow that exports headlessly on every push and pushes with butler, cached so runs after the first take ~2 min. Its scaffolder measures the project first (Godot version, export preset, thread support, gitignore, renderer) and fails on the things that break the first run, and `--check` audits a pipeline that used to work. |
 | `itch-devlog` | Writes and files a short end-of-day devlog as an itch.io draft — pulls the day's work from git, translates it into player-facing bullets, and grabs a fresh screenshot from the running game. |
 | `godot-2d-placement-audit` | Asserts a Godot 4 2D layout numerically instead of trusting a screenshot or a green test suite — whether a spawn actually leaves its spawner, whether a radius reaches the tile beside it, whether every tile mask the level produces has a table entry, and whether sprites stay on their grid. Exists because these bugs present as "the tower doesn't shoot", never as an error, and the usual unit test hosts everything at the origin, where they cannot be reproduced. |
 | `kenney-asset-kit` | Measures a Kenney kit's real grid unit, wall height, pivot convention, model facing, module widths, palette and triangle budget straight out of the glTF instead of guessing, names the module families the kit does *not* ship, and gives a bounding-box-anchored placement pattern (Godot 4 helper included). A second probe does the same for the 2D packs — canvas size, retina ratio, content box and clustered palette — and gates a new sprite against them. |
@@ -56,6 +57,9 @@ skills/
 
 - The two Godot UI skills overlap heavily by design — `-juicy` is the animated superset. If you only
   ever want one, install and ignore the other; they don't conflict.
+- `itch-ci-deploy` is the third itch skill and the only one that does not open a browser: butler can
+  push a build and nothing else, so it writes the workflow and hands you the short list of clicks the
+  page still needs.
 - `itch-store-page` and `itch-devlog` both drive a real logged-in Chrome session via the Claude in
   Chrome extension. They don't use the itch.io API, because it can't touch page presentation.
 - `skill-feedback-issue` closes the loop the other skills open: when one of them gets something

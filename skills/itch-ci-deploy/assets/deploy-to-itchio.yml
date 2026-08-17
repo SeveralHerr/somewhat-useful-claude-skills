@@ -1,0 +1,124 @@
+name: Deploy to itch.io
+
+on:
+  push:
+    branches:
+      - {{BRANCH}}
+  workflow_dispatch:
+
+# Only the newest push to {{BRANCH}} can reach itch.io, so letting an older run finish
+# means paying for a full build-and-deploy whose artifact is immediately replaced.
+concurrency:
+  group: deploy-itchio
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      # The release tag, and the directory name Godot expects templates under —
+      # they differ only in the separator, and both are needed.
+      GODOT_VERSION: {{GODOT_VERSION}}
+      GODOT_TEMPLATE_DIR: {{GODOT_TEMPLATE_DIR}}
+      EXPORT_PRESET: "{{PRESET}}"
+      EXPORT_PATH: {{EXPORT_PATH}}
+      EXPORT_DIR: {{EXPORT_DIR}}
+      ITCH_TARGET: {{ITCH_TARGET}}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    # The engine and the templates are ~50 MB and ~1 GB, and neither changes until
+    # GODOT_VERSION does, so both keys are stable and every run after the first is a
+    # restore instead of a download.
+    - name: Cache Godot editor
+      id: cache-godot
+      uses: actions/cache@v4
+      with:
+        path: ~/godot-bin
+        key: godot-editor-${{ env.GODOT_VERSION }}-linux
+
+    - name: Download Godot
+      if: steps.cache-godot.outputs.cache-hit != 'true'
+      run: |
+        wget https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip -O godot.zip
+        unzip godot.zip -d godot
+        mkdir -p ~/godot-bin
+        mv godot/Godot_v${GODOT_VERSION}_linux.x86_64 ~/godot-bin/godot
+        chmod +x ~/godot-bin/godot
+
+    - name: Put Godot on PATH
+      run: echo "$HOME/godot-bin" >> $GITHUB_PATH
+
+    - name: Cache Godot export templates
+      id: cache-templates
+      uses: actions/cache@v4
+      with:
+        path: ~/.local/share/godot/export_templates
+        key: godot-templates-${{ env.GODOT_VERSION }}
+
+    - name: Download Godot Export Templates
+      if: steps.cache-templates.outputs.cache-hit != 'true'
+      run: |
+        wget https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_export_templates.tpz -O templates.zip
+        mkdir -p ~/.local/share/godot/export_templates/${GODOT_TEMPLATE_DIR}
+        unzip templates.zip -d ~/.local/share/godot/export_templates/${GODOT_TEMPLATE_DIR}
+        mv ~/.local/share/godot/export_templates/${GODOT_TEMPLATE_DIR}/templates/* ~/.local/share/godot/export_templates/${GODOT_TEMPLATE_DIR}/
+        rmdir ~/.local/share/godot/export_templates/${GODOT_TEMPLATE_DIR}/templates
+
+    # `.godot/` is gitignored, so a fresh checkout reimports every texture and scene
+    # from scratch. Key on the sources that invalidate it; restore-keys means a
+    # near-miss still seeds the cache instead of starting from nothing.
+    - name: Cache imported resources
+      uses: actions/cache@v4
+      with:
+        path: .godot
+        key: godot-import-${{ env.GODOT_VERSION }}-${{ hashFiles('**/*.gd', '**/*.tscn', '**/*.tres', '**/*.import', 'project.godot') }}
+        restore-keys: |
+          godot-import-${{ env.GODOT_VERSION }}-
+
+    # Without an import cache the export produces a broken or empty build. The first
+    # pass can legitimately fail while it is still resolving `class_name`
+    # declarations, so run it twice. On a cache hit both passes are near no-ops.
+    - name: Import project resources
+      run: |
+        godot --headless --path . --import || true
+        godot --headless --path . --import
+
+    # The export directory is gitignored and therefore absent on a fresh checkout.
+    # Godot fails the export outright if the target directory does not exist.
+    - name: Create output directory
+      run: mkdir -p "${EXPORT_DIR}"
+
+    - name: Export project
+      run: godot --headless --path . --export-release "${EXPORT_PRESET}" "${EXPORT_PATH}"
+
+    # Godot exits 0 from a failed export often enough that the file, not the exit
+    # code, is the thing to check.
+    - name: Verify export output
+      run: |
+        if [ ! -f "${EXPORT_PATH}" ]; then
+          echo "::error::Export produced no ${EXPORT_PATH} - aborting deploy."
+          ls -la "${EXPORT_DIR}" || true
+          exit 1
+        fi
+        ls -la "${EXPORT_DIR}"
+
+    - name: Install Butler
+      run: |
+        curl -L -o butler.zip https://broth.itch.zone/butler/linux-amd64/LATEST/archive/default
+        unzip butler.zip
+        sudo mv butler /usr/local/bin/butler
+        sudo chmod +x /usr/local/bin/butler
+        butler -V  # Verify installation
+
+    # butler reads BUTLER_API_KEY from the environment; the repository secret of the
+    # same name is the one-time setup step. A missing secret fails here, at the push,
+    # with butler's own "no credentials" error - not earlier.
+    - name: Deploy to itch.io
+      env:
+        BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+      run: |
+        butler push "${EXPORT_DIR}" "${ITCH_TARGET}" --userversion "${GITHUB_SHA::7}"

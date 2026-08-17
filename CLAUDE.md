@@ -4,8 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-A content repository, not an application: eight Claude Code skills for indie game development
-(Godot 4 UI, itch.io publishing, Kenney assets, Blender asset authoring, seeded game design, and a
+A content repository, not an application: ten Claude Code skills for indie game development
+(Godot 4 UI, itch.io publishing and CI deploy, Kenney assets, Blender asset authoring, seeded game design, and a
 self-improvement loop), packaged as one installable plugin. There is nothing to build, no dependency
 manifest, and no test runner. The deliverable is Markdown plus a handful of standalone scripts.
 
@@ -23,6 +23,8 @@ python skills/godot-game-ui/scripts/palette_lint.py [<dir with ui_theme.gd>] [--
 python skills/skill-feedback-issue/scripts/resolve_skill.py <skill> [--ran-from <dir>] [--json]
 python skills/godot-game-ui-juicy/scripts/scaffold_juicy_ui.py <godot project>
 python skills/itch-store-page/scripts/store_art.py palette|cover|banner --src shot.png
+python skills/itch-ci-deploy/scripts/scaffold_itch_deploy.py <godot project> --target user/game:html5 [--check]
+python skills/itch-ci-deploy/scripts/smoke_test_scaffold.py                     # SMOKE: ALL PASS; proves the checks can fail
 ```
 
 Verifying a change to the Godot templates requires a real Godot 4 project — the templates are
