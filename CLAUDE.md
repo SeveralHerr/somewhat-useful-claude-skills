@@ -19,13 +19,39 @@ python skills/kenney-asset-kit/scripts/kenney_probe.py "<kit dir>" [--json]
 python skills/kenney-asset-kit/scripts/kenney_probe2d.py "<2D pack dir>" [--check FILE] [--json]
 python skills/blender-mcp-modelling/scripts/style_probe.py "<ref dir>" [--check FILE] [--json]
 python skills/godot-game-ui/scripts/scaffold_ui.py <godot project> [--only theme,hud] [--dest ui] [--force]
-python skills/godot-game-ui/scripts/palette_lint.py [<dir with ui_theme.gd>] [--json]   # default: the templates
+python skills/godot-game-ui/scripts/palette_lint.py [<dir with ui_theme.gd>] [--contrast-table] [--json]
 python skills/skill-feedback-issue/scripts/resolve_skill.py <skill> [--ran-from <dir>] [--json]
 python skills/godot-game-ui-juicy/scripts/scaffold_juicy_ui.py <godot project>
 python skills/itch-store-page/scripts/store_art.py palette|cover|banner --src shot.png
 python skills/itch-ci-deploy/scripts/scaffold_itch_deploy.py <godot project> --target user/game:html5 [--check]
 python skills/itch-ci-deploy/scripts/smoke_test_scaffold.py                     # SMOKE: ALL PASS; proves the checks can fail
 ```
+
+`tools/` is repo maintenance — the only scripts here that do **not** ship to a user:
+
+```bash
+python tools/verify_skill.py <skill> [--all] [--json] [--keep] [--strict]   # every test that skill ships
+python tools/verify_skill.py <skill> --mutate <file> <find> <replace>       # prove an assertion can fail
+python tools/lint_markdown.py [<file.md>|<dir>] [--json]   # default: skills/*/SKILL.md + root *.md
+python tools/release_check.py [--release] [--baseline VERSION] [--json]
+python tools/smoke_test_tools.py                           # SMOKE: ALL PASS; proves both checks can fail
+```
+
+`lint_markdown.py` exits 1 on Markdown that renders as something other than what it says — a
+bold paragraph swallowed by the bullet above it, an unclosed fence, a heading with no blank
+line over it. SKILL.md *is* the product, so a rendering bug is a defect in the deliverable.
+Its lazy-continuation rule is deliberately narrow: indentation cannot separate the bug from a
+wrapped bullet line, since both sit at column 0, so it fires only on block-shaped leads
+CommonMark cannot start mid-paragraph (`**strong**`, a table row, a link reference definition).
+Wrapped prose is exempt *by rule*, which is why there is no ignore pragma — and why a plain
+prose paragraph glued to a bullet is a documented miss rather than an oversight.
+
+`release_check.py` exits 1 when the hand-synced descriptions and keywords in `plugin.json` and
+`marketplace.json` have drifted, a `SKILL.md`'s frontmatter is not exactly `name` + `description`
+with `name` equal to its directory, or a skill is missing from README.md's table — and exits
+**2**, distinctly, when everything agrees but `--release` was passed and the version was not
+bumped past HEAD's. The default mode treats an unbumped version as a note, because a check that
+reddens on every non-release day gets switched off.
 
 Verifying a change to the Godot templates requires a real Godot 4 project — the templates are
 `.gd` files this repo never compiles:
@@ -39,6 +65,25 @@ godot --headless --path /tmp/probe-project --script res://smoke_test.gd   # prin
 
 `godot-game-ui-juicy` additionally ships `assets/juice_test.gd`, run the same way. Skipping the
 `--import` pass is the usual cause of a parse-error cascade in files nobody touched.
+
+**`tools/verify_skill.py` is that whole loop**, and is what you should actually run — it writes
+the minimal `project.godot` the scaffolders require but never create, always imports, then runs
+every `assets/*_test.gd` plus `palette_lint.py` over both the templates and the scaffolded
+`scripts/ui`. It judges a run on its marker line *and* its exit code *and* its stderr, because
+none of the three is sufficient alone. The import is a type rather than a step: `run_godot_script`
+takes an `ImportedProject` that only `godot_import` can construct, so the "Could not find type
+GameHud" cascade is unreachable rather than merely discouraged. The block above is kept because
+it is what the tool does, and you will need it the day the tool is what is broken.
+
+```bash
+python tools/verify_skill.py godot-game-ui-juicy   # SMOKE / JUICE / PALETTE, one command
+python tools/verify_skill.py --all                 # the shared-file check: both UI kits at once
+```
+
+The other half of the convention below — an assertion is not done until it has been shown to FAIL
+— is `--mutate`, which patches the *scaffolded* copy, requires the suite to go red, restores, and
+requires green again. Its exit code answers "can this assertion fail?": 0 = caught, 1 = the suite
+stayed green and the assertion is decorative.
 
 `godot-2d-placement-audit` is checked the same way and needs no scaffolder — copy both files into
 any Godot 4 project and run the test, which prints `SMOKE: ALL PASS` and exits 0:
@@ -54,6 +99,12 @@ Read stderr on that run, not just the exit code. GDScript's `%` operator support
 than C's — `%g` is not among them — and an unsupported one yields an empty string plus a stderr
 line rather than an error, so a check keeps "passing" while reporting nothing. The smoke test
 asserts every message is non-empty for that reason.
+
+The exit code alone is not enough either, and this is not hypothetical: `juice_test.gd` used to
+end by returning `true` from a `SceneTree`'s `_process`, which quits with 0 no matter what, so it
+printed `JUICE: 1 FAILED` and still exited green. It calls `quit(0)`/`quit(1)` now, the way
+`smoke_test.gd` always has — but any *new* test script inherits the trap, so make a new suite
+prove it can exit non-zero before you trust it.
 
 `skills/godot-game-ui/evals/evals.json` is a `skill-creator` eval set (`skill_name` + `evals[]`
 of `prompt` / `expected_output` / `assertions`); run it through the `skill-creator` skill. It is
@@ -99,6 +150,30 @@ literals, which put `clinical` at 1.41:1 text-on-button contrast. Achromatic lit
 a luminance-picked ink stay correct under every palette. Run it over a scaffolded project's
 `scripts/ui` too — the rules are the same there, which is what makes it a user tool rather than
 a repo-only lint.
+
+**It has a second arm: contrast.** Reachability and legibility are different failures — a
+hand-written palette can route every colour through `ui_theme.gd` correctly and still be
+unreadable — so `--contrast-table` measures sixteen ink/surface pairs and exits 1 under WCAG AA
+(4.5, and 3.0 for the `TEXT_DIM`/`TEXT_FAINT` tiers the design deliberately whispers with; that
+is why a fact must never appear *only* in those tiers). Two things make this measurable rather
+than a matter of taste, and both had to be settled before the check could exist:
+
+- **Composite, do not read `bg_color`.** The naive figure condemns five of six shipped palettes
+  — amber's secondary button is 4.00 raw and 11.32 composited — and a check that fires on
+  correct code is switched off within a week. Secondary buttons sit at 0.95 over a 0.88 panel
+  over a 0.86 backdrop, so gameplay leakage into that pixel is 0.084%, below one 8-bit step.
+  Where leakage is real (the HUD pill, 32%) the pair is evaluated over *both* black and white
+  and judged on the worse end, which bounds it with no assumption about the game underneath.
+- **Use the real sRGB transform.** The figures that opened this investigation were computed by
+  weighting raw sRGB components as if already linear — `Color.get_luminance()`'s maths, not
+  WCAG's piecewise one. Under the correct transform candy is 5.09, not 2.78. Exactly one of
+  the original numbers survived: `bloodmoon`'s primary button really was broken at 3.47:1
+  hover, because a saturated red takes neither black nor white ink, and its `ACCENT` was
+  deepened to fix it.
+
+Some things have no ratio at all — the crosshair ring and any bare `Glyph` draw straight onto
+gameplay with no surface behind them. The kit answers those with geometry (outline, shadow, ring
+thickness), and the SKILL.mds say so rather than implying the table covers everything.
 
 **The two UI skills share files byte-for-byte.** `ui_theme.gd`, `ui_motion.gd`,
 `smoke_test.gd` and `palette_lint.py` are identical copies in `godot-game-ui` and

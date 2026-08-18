@@ -403,12 +403,79 @@ screens as well as the kit's. Run it after adding a screen of your own; that is 
 literals appear. Four shipped in this kit at once for exactly this reason, and the scaffolder
 went on telling everyone the palette was the whole art direction the entire time.
 
+### The contrast guarantee, and where it stops
+
+The same script's second arm answers the other question about a palette: not "can a re-skin
+reach this colour" but "can anyone read the text on it". It measures **sixteen ink/surface
+pairs** the kit actually renders and exits 1 on any that lands under its bar.
+
+```bash
+python <skill dir>/scripts/palette_lint.py <project>/scripts/ui --contrast-table
+```
+
+Two things in that measurement are easy to get wrong, and getting either wrong produces
+numbers that look authoritative and are not:
+
+**Colour space.** Godot `Color` components are sRGB-encoded, and `Color.get_luminance()`
+weights them with no transfer curve — it is a perceived-brightness helper, not WCAG relative
+luminance. Skipping the piecewise transform understates every mid-tone badly: `bloodmoon`'s
+primary button reads 2.65:1 that way and 4.14:1 correctly, and a bar set on the first number
+condemns half this file. `UiTheme.relative_luminance()` and `UiTheme.contrast_ratio()` do it
+properly and are there for your own screens too.
+
+**Compositing.** Every surface here is translucent on purpose, so the ratio between an ink
+constant and a fill constant describes a colour that is never on screen. In `amber` the
+secondary button's raw `bg_color` gives 4.00:1 against TEXT; the button a player actually sees
+— 0.95 alpha over a 0.88 panel over a 0.86 backdrop — is **11.32:1**. Where gameplay can still
+show through the bottom of a stack, the pair is measured over both black and white and judged
+on the worse end, so the figure is a bound rather than a guess about your game. The largest
+leak in the kit is a HUD pill at 32%; the smallest is the pause menu's buttons at 0.084%, which
+is less than one step of an 8-bit channel and is why the shell screens are effectively exact.
+
+**The shipped six, worst case over any gameplay:**
+
+| pair | bar | amber | clinical | bloodmoon | candy | noir | verdant |
+|---|---|---|---|---|---|---|---|
+| TEXT on a panel | 4.5 | 16.17 | 14.24 | 14.60 | 11.38 | 15.73 | 15.79 |
+| TEXT on the backdrop | 4.5 | 11.45 | 9.10 | 12.50 | 10.56 | 12.56 | 12.39 |
+| TEXT on a HUD pill | 4.5 | 6.02 | 6.83 | 6.31 | 5.01 | 6.29 | 6.26 |
+| TEXT on a reward card | 4.5 | 12.25 | 12.35 | 11.67 | 8.52 | 12.22 | 12.13 |
+| CHIP_INK on the keycap | 4.5 | 12.69 | 10.85 | 11.28 | 12.26 | 13.25 | 12.68 |
+| secondary button, worst state | 4.5 | 7.10 | 10.88 | 6.35 | 5.09 | 6.66 | 6.67 |
+| primary button, worst state | 4.5 | 7.75 | **4.52** | **4.79** | 5.12 | 6.61 | 7.35 |
+| TEXT_DIM, worst surface | 3.0 | 3.57 | **3.15** | 3.35 | 3.42 | 3.61 | 4.27 |
+| TEXT_FAINT, worst surface | 3.0 | 4.79 | 3.46 | **3.42** | 3.77 | 4.05 | 5.11 |
+
+Two bars because the type ramp has two intentions. TEXT, the button inks and CHIP_INK carry
+information and are held to WCAG AA 4.5. TEXT_DIM and TEXT_FAINT are the tiers the design
+deliberately whispers with — a card kicker, a controls hint, a stat caption — and are held to
+3.0. That is not a discount for failing the real bar; it is the reason **those two tiers must
+never be the only place a fact appears.**
+
+The bolded cells are the narrow passes. `clinical`'s pressed primary at 4.52 and its TEXT_DIM
+at 3.15 are what a light-panelled palette costs; `bloodmoon`'s 4.79 is a red that was moved to
+get there — see `references/palettes.md`.
+
+**Where the guarantee stops, and what to check by hand.** The crosshair ring and any bare
+`Glyph` drawn straight onto gameplay have no surface behind them at all, so no ratio exists for
+them and nothing measures them. That is a real gap, not an oversight: the kit's answer there is
+the outline-plus-shadow every label gets from `style_label` and the ring's own thickness, both
+of which are geometry rather than colour. If your game is bright — snow, daylight, a white
+lab — look at the crosshair and the HUD glyphs against your brightest scene, because that is
+the one thing the lint will never tell you about.
+
 ## Verifying an install
 
 `assets/smoke_test.gd` exercises the whole kit headlessly — it configures a HUD in the same
 frame it creates it, checks every value is correct with zero frames pumped, asserts the card
 queue keeps the *first* card, checks the prompt drops its keycap on a status message, and
 verifies the pause menu's buttons are `PROCESS_MODE_ALWAYS` and its signals fire.
+
+It also re-measures the button contrast against what Godot actually built — the real
+`StyleBoxFlat.bg_color` and the real `font_color` override, composited down the real panel and
+backdrop. That is deliberate duplication: `palette_lint.py` has to *replicate* `style_button`'s
+derivation to measure it from the source, and that replica is the thing most likely to go stale
+if you edit the theme. When the two disagree, the engine-side one is right.
 
 ```bash
 cp <skill dir>/assets/smoke_test.gd <project>/smoke_test.gd
@@ -431,10 +498,13 @@ scaffolding, or when a piece needs to behave differently from the template.
 when a palette is written by hand. `--palette` reads this file at scaffold time.
 
 `scripts/palette_lint.py` — run over `assets/templates/` by default, or over a project's
-`scripts/ui`. Names every colour a re-skin cannot reach. Anything that genuinely must be a
-literal takes `# palette-lint: ignore` on its line; black, white and greys are exempt already,
-since a drop shadow or a luminance-picked ink is not a palette choice and stays correct under
-every palette. A colour with a hue is not.
+`scripts/ui`. Two arms. The first names every colour a re-skin cannot reach; anything that
+genuinely must be a literal takes `# palette-lint: ignore` on its line, and black, white and
+greys are exempt already, since a drop shadow or a measured black-or-white ink is not a palette
+choice and stays correct under every palette. A colour with a hue is not. The second arm
+measures the sixteen ink/surface pairs the kit renders and fails any that is under WCAG AA;
+`--contrast-table` prints them all, passing ones included, which is what to run while writing
+a palette rather than after shipping one.
 
 `assets/templates/` — the installable files themselves. Read the one you are adapting;
 they are commented with the reasoning, not just the what.

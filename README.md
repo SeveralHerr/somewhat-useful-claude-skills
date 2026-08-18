@@ -25,7 +25,7 @@ For local development against a checkout instead of GitHub, point the marketplac
 
 | Skill | What it does |
 | --- | --- |
-| `godot-game-ui` | Builds polished in-game UI for Godot 4 — HUDs, pause menus, title screens, results screens, counters, prompts. Ships a Python scaffolder that installs a working UI kit into any Godot project, in one of six palettes picked from the game's tone, plus a lint that proves the palette really is the whole art direction. |
+| `godot-game-ui` | Builds polished in-game UI for Godot 4 — HUDs, pause menus, title screens, results screens, counters, prompts. Ships a Python scaffolder that installs a working UI kit into any Godot project, in one of six palettes picked from the game's tone, plus a lint that proves the palette really is the whole art direction and measures every ink/surface pair against WCAG AA. |
 | `godot-game-ui-juicy` | Everything `godot-game-ui` ships, plus a full motion layer: overshoot entrances, staggered rows, punching counters, shake and screen flash — with a global switch to turn it all off. |
 | `itch-store-page` | Sets up or updates an itch.io game page (theme colours, tagline, tags, cover, banner, screenshots) by driving your logged-in Chrome, and generates store art and a palette from gameplay screenshots. |
 | `itch-ci-deploy` | Sets up continuous deployment of a Godot 4 Web build to itch.io — a GitHub Actions workflow that exports headlessly on every push and pushes with butler, cached so runs after the first take ~2 min. Its scaffolder measures the project first (Godot version, export preset, thread support, gitignore, renderer) and fails on the things that break the first run, and `--check` audits a pipeline that used to work. |
@@ -51,6 +51,7 @@ skills/
     scripts/         # optional executables the skill calls
     assets/          # optional templates the skill copies into a project
     references/      # optional docs the skill reads on demand
+tools/               # repo maintenance; the only scripts here that don't ship to you
 ```
 
 ## Notes
@@ -68,6 +69,10 @@ skills/
   reports; it never patches. A fix reaches you only after someone acts on it, bumps the version,
   and you `/plugin update` — a skill runs from the plugin cache pinned to a commit, never from
   your checkout.
+- `tools/` is not part of the plugin — nothing in it is installed. `verify_skill.py <skill>` runs
+  every test a skill ships (it writes the throwaway Godot project itself); `lint_markdown.py` and
+  `release_check.py` guard the deliverable and the release metadata. If you fork this, they are
+  what tells you a change is safe.
 - `game-from-gibberish` hands the actual building off to the Godot UI skills above and to the
   `godot-selftest-harness` plugin; on its own it only produces the brief. Its wordlists live in
   `references/axes.md` and are meant to be edited —

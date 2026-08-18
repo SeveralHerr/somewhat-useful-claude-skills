@@ -115,12 +115,19 @@ func _process(_delta: float) -> bool:
 		5:
 			_check_punches_land()
 		_:
+			# quit() with the code, the way smoke_test.gd does. Returning true from a
+			# SceneTree's _process ends the run with 0 whatever happened, so this suite
+			# used to report every failure on stdout and still exit green — a caller
+			# grading it on `$?` alone had never once seen it fail. The marker line is
+			# still what a reader looks at; the code is what a runner can trust.
 			if _fails.is_empty():
 				print("JUICE: ALL PASS")
+				quit(0)
 			else:
 				print("JUICE: %d FAILED" % _fails.size())
 				for f: String in _fails:
 					print("  - " + f)
+				quit(1)
 			return true
 	_step += 1
 	return false

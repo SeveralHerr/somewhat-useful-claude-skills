@@ -104,6 +104,24 @@ click silently does nothing.
 
 Screenshots accept all files in one go; cover and banner are single.
 
+### Replacing an image that is already set
+
+The two single-image widgets behave in opposite ways, so the rule is per widget:
+
+- **Edit form, cover** — *never* click remove. With an image already set, the widget's
+  own `.button` still opens the picker and the new file **replaces** the old one. There
+  is nothing to clear first. Clicking `.remove_image_btn` from JS froze CDP for ~45s,
+  which is the signature of a native `confirm()` — the modal blocks the page, your
+  evaluate never returns, and the browser tooling has no way to answer it. That is the
+  one class of dialog this repo's browser guidance says not to trigger, and here you do
+  not need to.
+- **Theme editor, banner** — inverted. With an image set, the only control offered is
+  **Remove image**; `Upload` does not reappear until after it. That path is safe — no
+  dialog, no hang — so removing first is required rather than forbidden.
+
+Read the widget before acting rather than carrying one habit to the other: "which button
+is present" is the question, and the answer differs between the two editors.
+
 ## Field reference
 
 Edit form:
@@ -196,9 +214,53 @@ el.dispatchEvent(new Event('change', { bubbles: true }));
 
 ## Art and colours
 
-`scripts/store_art.py` (needs Pillow) does the two things that are easy to botch —
-integer downscaling so pixel art stays crisp, and supersampled titles that sit on the
-art's own pixel grid rather than looking pasted on:
+**If the game has a title screen, photograph it. Composite text only when there is
+nothing to photograph.** The game's own title is already set in the game's own font, at
+the game's own weight, on the game's own background — every one of which this script is
+guessing at. Shooting it is both less work and a better picture.
+
+The composite path (`--title`) is not a general-purpose feature; it is a *pixel-art*
+feature. It renders the title small and NEAREST-upscales it so the letterforms land on
+the same pixel grid as the art, which is exactly right over hard-edged pixel art and
+exactly wrong over smooth vector art, where the same chunky lettering reads as a sticker
+someone stuck on afterwards.
+
+Treat that as a trap rather than a preference, because **nothing errors**. The crop is
+valid, the text fits, the file is the right size, the upload succeeds — and the only
+signal that it is wrong is a human looking at it and calling it awful, which is late and
+expensive. That is what happened on the report behind this section: a pixel-font banner
+over a smooth vector game, rejected outright, replaced by a photograph of the title
+screen.
+
+### Photographing the title screen
+
+The menu is in the way, and menus are the part of a title screen that must not appear in
+store art — buttons imply a click that the image cannot receive.
+
+1. **Hide the menu first.** Through the project's devtools bridge, set the buttons and
+   any version/prompt labels invisible (`set-state visible=false` or the project's
+   equivalent) — do not just crop around them, since the crop you want is usually the
+   part they sit in.
+2. Nudge what remains into the frame you are cutting: title labels toward the centre of
+   the target aspect, background scenery sprites re-spaced so the crop does not slice one
+   in half.
+3. Screenshot, then integer-crop to 960×400 (banner) and 630×500 (cover):
+
+```bash
+python scripts/store_art.py banner --src title_screen.png --out banner.png --no-title
+python scripts/store_art.py cover  --src title_screen.png --out cover.png  --no-title
+```
+
+`--no-title` draws nothing: integer crop, plus a scrim only if you name one. It is what
+omitting `--title` has always done — the flag exists so the intent is on the command line
+and so passing both fails loudly instead of quietly compositing over lettering that was
+already there. Integer scaling is not optional in either mode: the crop is always an
+exact whole multiple of the target, box-filtered down by that whole number, so there is
+no non-integer path to fall into.
+
+### When there is nothing to photograph
+
+No title screen, or a screen that photographs badly — then composite:
 
 ```bash
 python scripts/store_art.py palette --src shot.png
@@ -206,7 +268,8 @@ python scripts/store_art.py cover  --src shot.png --out cover.png  --title "GAME
 python scripts/store_art.py banner --src shot.png --out banner.png --title "GAME"
 ```
 
-`--focus x,y` recentres the crop; `--scrim bottom|left|none` controls the text backing.
+`--focus x,y` recentres the crop; `--scrim bottom|left|none` controls the text backing
+(and with `--no-title`, applies only when named explicitly).
 
 Source the screenshots from the game itself, driven to a scene worth showing — a fresh
 save is usually sparse and photographs as an empty field. If the project has a devtools

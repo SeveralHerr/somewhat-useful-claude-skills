@@ -7,16 +7,25 @@ screenshots look right on a store page are both easy to get subtly wrong by hand
   1. Integer downscale. Pixel art is drawn at some integer zoom, so a 1920x1080 grab has
      each source pixel as an NxN block. Resampling by a non-integer factor smears those
      blocks and the art reads as blurry JPEG mush. This crops an exact multiple of the
-     target and then box-filters by that whole number, so blocks stay square.
+     target and then box-filters by that whole number, so blocks stay square. Every path
+     through this script gets that, `--no-title` included - there is no non-integer mode
+     to fall out of.
 
   2. Supersampled text. An antialiased vector glyph laid over hard-edged pixel art reads
      as a sticker someone stuck on afterwards. Rendering the title small and blowing it up
      with NEAREST puts the letterforms on the same pixel grid as the game.
 
+That second one is only right for a game whose art is *already* on a pixel grid. Over
+smooth vector art the same chunky title reads as a sticker again, and a game with its own
+title screen has better lettering than this script can composite. So when the game has a
+title screen, shoot that and crop it with `--no-title`; reach for the composite only when
+there is nothing to photograph.
+
 Usage:
     python store_art.py palette --src shot.png
     python store_art.py cover   --src shot.png --out cover.png  --title "GAME" --subtitle "tagline"
     python store_art.py banner  --src shot.png --out banner.png --title "GAME"
+    python store_art.py banner  --src title_screen.png --out banner.png --no-title
 
 Requires Pillow.
 """
@@ -120,6 +129,13 @@ def fit_text(text, px, fill, outline, font_path, max_w):
 
 
 def build(args, target, default_scrim, title_px, sub_px):
+    # --no-title draws nothing, which is also what omitting --title has always done. It
+    # exists to make that an assertion rather than an accident: passing both is the habit
+    # that produces a composited title over a title screen that already has one, and that
+    # failure is aesthetic, so nothing downstream errors on it.
+    if args.no_title and (args.title or args.subtitle):
+        sys.exit("--no-title takes no --title/--subtitle: pick the photograph path or the composite path.")
+
     src = Image.open(args.src).convert("RGB")
     focus = tuple(int(v) for v in args.focus.split(",")) if args.focus else None
     im = integer_crop(src, target, focus).convert("RGBA")
@@ -153,6 +169,12 @@ def build(args, target, default_scrim, title_px, sub_px):
             for p in parts:
                 im.alpha_composite(p, ((target[0] - p.width) // 2, y))
                 y += p.height + 10
+    elif args.scrim and args.scrim != "none":
+        # A scrim with no text on it is legitimate - it darkens one edge so itch's own
+        # overlaid page furniture stays readable. It used to be silently dropped when no
+        # title was given, so `--scrim left` alone wrote a byte-identical file and looked
+        # like the flag had no effect.
+        add_scrim(im, args.scrim)
 
     im.convert("RGB").save(args.out)
     print(f"{args.out}  {Image.open(args.out).size}  {os.path.getsize(args.out)//1024} KB")
@@ -188,8 +210,19 @@ def main():
             p.add_argument("--out", required=True)
             p.add_argument("--title")
             p.add_argument("--subtitle")
+            p.add_argument(
+                "--no-title",
+                action="store_true",
+                help="draw no text: integer crop (plus --scrim if given) only. Use this "
+                     "when the source is the game's own title screen.",
+            )
             p.add_argument("--font")
-            p.add_argument("--scrim", choices=["bottom", "left", "none"])
+            p.add_argument(
+                "--scrim",
+                choices=["bottom", "left", "none"],
+                help="darken one edge. With text it backs the text; on its own it is "
+                     "applied only when named explicitly.",
+            )
             p.add_argument("--focus", help="x,y in source pixels to centre the crop on")
     a = ap.parse_args()
 

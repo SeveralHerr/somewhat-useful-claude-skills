@@ -307,9 +307,67 @@ palette substitutes. Under the light-panelled `clinical` palette that rendered n
 on a near-black button — 1.41:1 contrast, against 4.5:1 for legible.
 
 Black, white and greys are exempt, because a drop shadow, the white screen flash and a
-luminance-picked ink are not palette choices and stay correct under every palette. A colour
-with a hue is not. Anything that genuinely must be a literal takes `# palette-lint: ignore`
-on its line.
+measured black-or-white ink are not palette choices and stay correct under every palette. A
+colour with a hue is not. Anything that genuinely must be a literal takes
+`# palette-lint: ignore` on its line.
+
+### The contrast guarantee, and where it stops
+
+That 1.41:1 figure above is the reason the same script has a second arm. Reachability and
+readability are different properties: a palette can route every colour through the PALETTE
+block, pass all three rules, and still pair near-black ink with a near-black button. Until
+this existed, nothing in the kit measured contrast at all, which made `--palette` — and "copy
+the closest palette and change ACCENT" — an invitation to ship an unreadable UI with every
+check green.
+
+```bash
+python <skill dir>/scripts/palette_lint.py <project>/scripts/ui --contrast-table
+```
+
+Sixteen ink/surface pairs, exit 1 on any under its bar. Two things in that measurement are easy
+to get wrong and both produce numbers that look authoritative:
+
+**Colour space.** Godot `Color` components are sRGB-encoded and `Color.get_luminance()` weights
+them with no transfer curve — perceived brightness, not WCAG relative luminance. Skipping the
+piecewise transform understates every mid-tone: `bloodmoon`'s primary button reads 2.65:1 that
+way and 4.14:1 correctly. `UiTheme.relative_luminance()` and `UiTheme.contrast_ratio()` do it
+properly and are there for your own screens.
+
+**Compositing.** Every surface here is translucent on purpose, so the ratio between an ink
+constant and a fill constant describes a colour that is never on screen. In `amber` the
+secondary button's raw `bg_color` gives 4.00:1; the button a player sees is **11.32:1**. Where
+gameplay can still show through the bottom of a stack the pair is measured over both black and
+white and judged on the worse end, so the figure is a bound and not a guess about your game.
+
+**The shipped six, worst case over any gameplay:**
+
+| pair | bar | amber | clinical | bloodmoon | candy | noir | verdant |
+|---|---|---|---|---|---|---|---|
+| TEXT on a panel | 4.5 | 16.17 | 14.24 | 14.60 | 11.38 | 15.73 | 15.79 |
+| TEXT on the backdrop | 4.5 | 11.45 | 9.10 | 12.50 | 10.56 | 12.56 | 12.39 |
+| TEXT on a HUD pill | 4.5 | 6.02 | 6.83 | 6.31 | 5.01 | 6.29 | 6.26 |
+| TEXT on a reward card | 4.5 | 12.25 | 12.35 | 11.67 | 8.52 | 12.22 | 12.13 |
+| CHIP_INK on the keycap | 4.5 | 12.69 | 10.85 | 11.28 | 12.26 | 13.25 | 12.68 |
+| secondary button, worst state | 4.5 | 7.10 | 10.88 | 6.35 | 5.09 | 6.66 | 6.67 |
+| primary button, worst state | 4.5 | 7.75 | **4.52** | **4.79** | 5.12 | 6.61 | 7.35 |
+| TEXT_DIM, worst surface | 3.0 | 3.57 | **3.15** | 3.35 | 3.42 | 3.61 | 4.27 |
+| TEXT_FAINT, worst surface | 3.0 | 4.79 | 3.46 | **3.42** | 3.77 | 4.05 | 5.11 |
+
+Two bars because the type ramp has two intentions. TEXT, the button inks and CHIP_INK carry
+information and are held to WCAG AA 4.5. TEXT_DIM and TEXT_FAINT are the tiers the design
+deliberately whispers with, and are held to 3.0 — which is not a discount for failing the real
+bar but the reason **those two tiers must never be the only place a fact appears.**
+
+**Where the guarantee stops.** The crosshair ring and any bare `Glyph` drawn straight onto
+gameplay have no surface behind them, so no ratio exists and nothing measures them. The kit's
+answer there is the outline-plus-shadow every label gets and the ring's own thickness — both
+geometry, not colour. If your game is bright, that is the pair of things to check by eye
+against your brightest scene.
+
+Motion adds one more thing the lint cannot see: an element mid-entrance is at partial modulate,
+so its contrast is *lower than the table* for the length of the tween. That is fine for an
+entrance measured in a couple of hundred milliseconds and is not fine for a pulsing or
+breathing loop, which parks text at reduced alpha indefinitely. Pulse the surface, not the ink.
 
 ### Write a headless harness in the shape the shipped tests use
 
@@ -338,7 +396,9 @@ when a palette is written by hand. `--palette` reads this file at scaffold time.
 
 `scripts/palette_lint.py` — run over `assets/templates/` by default, or over a project's
 `scripts/ui`. Names every colour a re-skin cannot reach; see the section above for why this
-cannot be a Godot test.
+cannot be a Godot test. Its second arm measures the sixteen ink/surface pairs the kit renders
+against WCAG AA, and `--contrast-table` prints them all, passing ones included — run that while
+writing a palette rather than after shipping one.
 
 `assets/templates/` — the installable files. `ui_juice.gd` is the one worth reading in full;
 it is commented with the reasoning rather than the mechanics.

@@ -276,6 +276,88 @@ static func button_box(fill: Color, radius: int = 12) -> StyleBoxFlat:
 	box.content_margin_bottom = 14.0
 	return box
 
+# ------------------------------------------------------------------------------- contrast
+
+## WCAG 2.x AA for body text. The kit holds this on every ink/surface pair it renders itself;
+## `scripts/palette_lint.py` re-derives all of them for a palette you write. Text the design
+## deliberately whispers — TEXT_DIM, TEXT_FAINT — is held to 3.0 instead, and must never be
+## the only place a fact appears.
+const AA_CONTRAST: float = 4.5
+
+
+## WCAG 2.x relative luminance.
+##
+## Deliberately NOT `Color.get_luminance()`, and the difference is why this function exists.
+## get_luminance() weights the sRGB-ENCODED channels straight, with no transfer curve, which
+## understates every mid-tone. On `bloodmoon`'s red the two disagree by 1.6x — get_luminance()
+## says the primary button is at 2.65:1, the real figure is 4.14:1 — so a threshold tuned
+## against the wrong one either condemns a legible button or waves through an illegible one.
+## Godot's own docs describe get_luminance() as "perceived brightness", not as WCAG.
+static func relative_luminance(c: Color) -> float:
+	return 0.2126 * _linearise(c.r) + 0.7152 * _linearise(c.g) + 0.0722 * _linearise(c.b)
+
+
+static func _linearise(channel: float) -> float:
+	if channel <= 0.03928:
+		return channel / 12.92
+	return pow((channel + 0.055) / 1.055, 2.4)
+
+
+## WCAG contrast ratio: 1.0 is invisible, 21.0 is black on white. Alpha is ignored, so
+## composite() anything translucent onto its background first or this measures a colour that
+## is never on screen.
+static func contrast_ratio(a: Color, b: Color) -> float:
+	var la: float = relative_luminance(a)
+	var lb: float = relative_luminance(b)
+	return (maxf(la, lb) + 0.05) / (minf(la, lb) + 0.05)
+
+
+## `top` painted over an OPAQUE `under`. Straight-alpha source-over, in sRGB space, which is
+## what Godot's 2D pipeline does unless hdr_2d is on.
+##
+## Every surface in this kit is translucent, so `contrast_ratio(TEXT, PANEL_FILL)` measures a
+## colour nothing renders. Stack the layers bottom-up through this first, ending at something
+## opaque — BACKDROP_OPAQUE on a shell screen, or, for the HUD, the game itself, which is why
+## the HUD's guarantee has to be taken as the worse of black and white underneath.
+static func composite(top: Color, under: Color) -> Color:
+	var a: float = top.a
+	return Color(
+		top.r * a + under.r * (1.0 - a),
+		top.g * a + under.g * (1.0 - a),
+		top.b * a + under.b * (1.0 - a),
+		1.0
+	)
+
+
+## The lowest contrast `ink` reaches against any of `fills`.
+##
+## One label carries one colour across normal, hover, pressed and focus, so the state with the
+## least contrast is the one that decides — and it is never the state anyone looks at while
+## choosing colours. Hover is usually the worst: it lightens the fill, which helps dark ink and
+## hurts light ink, and half the palettes here use light ink.
+static func min_contrast(ink: Color, fills: Array[Color]) -> float:
+	var worst: float = 21.0
+	for f: Color in fills:
+		worst = minf(worst, contrast_ratio(ink, f))
+	return worst
+
+
+## Whichever candidate ink reads best across every fill it has to sit on.
+##
+## This replaces a `get_luminance() > 0.4` threshold — a guess at the answer to a question that
+## can simply be measured, and one that guessed wrong: it read `bloodmoon`'s accent as dark,
+## chose a tinted near-white, and landed on 3.47:1 over the hover fill. Measuring the same
+## palette picks plain white and gets 4.79:1 without moving a single palette constant.
+static func best_ink(fills: Array[Color], candidates: Array[Color]) -> Color:
+	var best: Color = candidates[0]
+	var best_worst: float = -1.0
+	for c: Color in candidates:
+		var worst: float = min_contrast(c, fills)
+		if worst > best_worst:
+			best_worst = worst
+			best = c
+	return best
+
 # ---------------------------------------------------------------------------------- text
 
 ## One call so no label anywhere forgets its outline.
@@ -329,10 +411,17 @@ static func style_button(b: Button, primary: bool = false, min_width: float = 32
 		hover = ACCENT.lightened(0.14)
 		press = ACCENT.darkened(0.14)
 		# The primary button is the one place TEXT is the wrong ink — it is chosen to read
-		# against panels, not against the accent. Luminance rather than HSV value, because
-		# value ignores how much each channel actually contributes: a saturated red at v=0.85
-		# is dark to the eye and wants light ink, and `bloodmoon` is exactly that palette.
-		ink = ACCENT.darkened(0.86) if ACCENT.get_luminance() > 0.4 else ACCENT.lightened(0.9)
+		# against panels, not against the accent. A tinted ink is preferred because it looks
+		# designed rather than defaulted, but the choice is MEASURED against all three fills
+		# rather than guessed from a luminance threshold: a saturated mid-tone accent takes
+		# neither black nor white well, and that band is exactly where a threshold picks the
+		# wrong side of a coin it should not be flipping. Plain black and white only appear
+		# when a tint would land under AA; they always win on ratio, so preferring them
+		# unconditionally would flatten every palette's primary button to the same two inks.
+		var fills: Array[Color] = [base, hover, press]
+		ink = best_ink(fills, [ACCENT.darkened(0.86), ACCENT.lightened(0.9)])
+		if min_contrast(ink, fills) < AA_CONTRAST:
+			ink = best_ink(fills, [Color(0, 0, 0, 1), Color(1, 1, 1, 1)])
 	b.add_theme_stylebox_override("normal", button_box(base))
 	b.add_theme_stylebox_override("hover", button_box(hover))
 	b.add_theme_stylebox_override("pressed", button_box(press))

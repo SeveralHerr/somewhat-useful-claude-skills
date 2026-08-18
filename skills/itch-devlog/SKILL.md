@@ -142,7 +142,7 @@ Form at `itch.io/dashboard/game/<id>/new-devlog`:
 | Field | Selector / value |
 |---|---|
 | Title | `input[name="post[title]"]` |
-| Body | `textarea[name="post[body]"]`, edited through the `.redactor-layer` contenteditable — click into it and type |
+| Body | `textarea[name="post[body]"]` — a Redactor editor writes into it; do **not** type at it directly, see below |
 | Category | `input[name="post[user_classification]"]` — `general_update`, `major_update`, `postmortem`, `tech_discussion`, `culture`, `tutorial`, `game_design`, `marketing`. **Nothing is preselected**; pick `general_update` for a daily, `major_update` for a release |
 | Tags | `input[name="post[tags]"]` |
 | Cover | `input[name="post[cover_image_id]"]` (hidden; set by the widget) |
@@ -154,6 +154,40 @@ Form at `itch.io/dashboard/game/<id>/new-devlog`:
 Write the bullets as a real list in the editor rather than lines starting with `-`;
 the feed renders the markup, not the dashes.
 
+### The body is a Redactor editor, and a devlog can save empty
+
+What gets posted is the hidden `textarea[name="post[body]"]`. The visible editor is
+Redactor, which fills that textarea from its *own* key handling — so synthetic input into
+the contenteditable can leave the textarea at length 0 while the text sits there plainly
+visible. Save then posts the empty string, and the devlog goes up with a title, a
+screenshot and **no body**.
+
+That is exactly the failure the store page's description field produced (see
+`itch-store-page`, "My description vanished when I saved"), where setting `innerHTML`,
+dispatching `input`/`keyup`, and a real driven keypress all left the textarea empty. The
+same form technology is behind both fields, so use the same defence here: write both
+halves, and read the textarea back before you press Save.
+
+```js
+const ta = document.querySelector('textarea[name="post[body]"]');
+const ed = document.querySelector('.redactor-in')
+        || document.querySelector('.redactor-layer')
+        || ta.parentElement.querySelector('[contenteditable="true"]');
+ed.innerHTML = html;
+ta.value = ed.innerHTML;      // the half that is actually submitted
+ta.value.length               // must be non-zero, or Save posts an empty devlog
+```
+
+**Resolve the element; do not hard-code the class.** The two forms have been observed
+disagreeing: a live read of the store edit form returned `.redactor-in` on 2026-08-17,
+while this devlog form was recorded using `.redactor-layer`. Either itch runs two Redactor
+versions on the same site or one of those observations has gone stale — nobody has looked
+at a live devlog form since, and this guidance has **not** been verified against one. That
+unresolved question is the argument for the fallback chain rather than a reason to wait
+for an answer: whichever class is right today, the chain finds it, and the
+`[contenteditable="true"]` fallback catches a third one nobody has seen yet. Treat a
+`null` at `ed`, or a zero-length `ta.value`, as the bug — do not save through it.
+
 ## Gotchas
 
 - **`Attach` does not touch the body.** It appends hidden `attachment[N]` inputs. So
@@ -164,7 +198,11 @@ the feed renders the markup, not the dashes.
   if they did not, since it implies a release that never happened.
 - **Serializing large chunks of this page can wedge the renderer** — an `outerHTML` dump
   or a full-page screenshot has hung the tab outright. Read narrow: specific selectors,
-  short slices.
+  short slices. The store page's edit form fails next door to this one: screenshots there
+  come back blank or time out at 30s (`itch-store-page`, Gotchas), and a blank frame reads
+  as an empty form and invites you to redo work that already landed. Same rule for both —
+  verify with narrow JS reads of the actual field values and a reload, and keep
+  screenshots for the rendered public page.
 - **Verify by reloading the saved post**, not by the form looking right. The editor
   shows optimistic state that a rejected save never rolls back.
 - A devlog **notifies followers on publish**. There is no quiet edit window worth

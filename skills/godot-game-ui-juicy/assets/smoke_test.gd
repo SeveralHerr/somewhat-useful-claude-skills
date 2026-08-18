@@ -189,6 +189,8 @@ func _run_main_checks() -> void:
 			if fired.size() != 1 or fired[0] != "menu":
 				_fails.append("'Quit to menu' fired %s, expected only menu_requested" % [fired])
 
+		_check_button_contrast(btns)
+
 	# The two sliders are optional the same way the two extra buttons are. A game with no
 	# camera-look system and no audio bus used to ship both of them anyway, visible and inert,
 	# which a player reads as a broken menu rather than as a feature this game does not have.
@@ -233,6 +235,58 @@ func _run_main_checks() -> void:
 	_bare = ResultsScreen.new()
 	sub.add_child(_bare)
 	_bare.present([{"label": "Score", "value": "1250"}], [], "Nearly there.")
+
+
+## The kit's readability guarantee, asserted against what Godot actually built rather than
+## against the palette constants it was built from.
+##
+## `scripts/palette_lint.py` measures the same pairs from the source, and has to REPLICATE
+## style_button's derivation to do it — the alpha, the two lightened() steps, the ink pick.
+## That replica is the thing most likely to go stale, so this reads the real StyleBoxFlat off
+## the real Button and the real font_color override off its theme, composites it down the real
+## panel and backdrop, and asserts the same bar. If the two ever disagree, this one is right.
+##
+## The compositing is the whole reason this is not a one-line comparison: every surface here is
+## translucent, so `bg_color` alone is a colour that is never on screen. Against `amber` the
+## raw figure is 4.00:1 and the composited one is 11.32:1.
+func _check_button_contrast(btns: Array[Node]) -> void:
+	# Bottom-up: opaque game-free ground, the modal backdrop, the panel, then the button.
+	var under: Color = UiTheme.composite(UiTheme.BACKDROP, UiTheme.BACKDROP_OPAQUE)
+	under = UiTheme.composite(UiTheme.PANEL_FILL_DEEP, under)
+
+	for b: Node in btns:
+		var button: Button = b as Button
+		for state: String in ["normal", "hover", "pressed"]:
+			var box: StyleBoxFlat = button.get_theme_stylebox(state) as StyleBoxFlat
+			if box == null:
+				_fails.append("button '%s' has no StyleBoxFlat for '%s'" % [button.name, state])
+				continue
+			var key: String = "font_color" if state == "normal" else "font_%s_color" % state
+			var ink: Color = button.get_theme_color(key)
+			var surface: Color = UiTheme.composite(box.bg_color, under)
+			var ratio: float = UiTheme.contrast_ratio(ink, surface)
+			if ratio < UiTheme.AA_CONTRAST:
+				_fails.append("button '%s' %s ink is %.2f:1 on its own fill, under AA %.1f"
+					% [button.name, state, ratio, UiTheme.AA_CONTRAST])
+
+	# The measurement has to be able to fail, or it is decoration. A mid-grey accent is the
+	# shape that defeats both inks, and the picker's job is to notice rather than to guess.
+	var trap: Color = Color(0.60, 0.45, 0.30)
+	var fills: Array[Color] = [trap, trap.lightened(0.14), trap.darkened(0.14)]
+	var tinted: Color = UiTheme.best_ink(fills, [trap.darkened(0.86), trap.lightened(0.9)])
+	if UiTheme.min_contrast(tinted, fills) >= UiTheme.AA_CONTRAST:
+		_fails.append("the AA bar cannot fail: a mid-grey accent scored %.2f:1"
+			% UiTheme.min_contrast(tinted, fills))
+
+	# ...and the WCAG transform has to be the WCAG one. get_luminance() skips it and reads
+	# bloodmoon's old accent 1.6x too dark, which is what made 4.14:1 look like 2.65:1.
+	var white_on_black: float = UiTheme.contrast_ratio(Color(1, 1, 1, 1), Color(0, 0, 0, 1))
+	if not is_equal_approx(white_on_black, 21.0):
+		_fails.append("contrast_ratio(white, black) = %.3f, expected 21.0" % white_on_black)
+	var mid: float = UiTheme.relative_luminance(Color(0.5, 0.5, 0.5, 1))
+	if absf(mid - 0.2140) > 0.002:
+		_fails.append("relative_luminance of 0.5 grey = %.4f, expected 0.2140 - the sRGB "
+			% mid + "transform is missing, which is Color.get_luminance()'s 0.5000")
 
 
 ## Measured a frame after the screen is built, because present() rebuilds the tree and a

@@ -64,12 +64,18 @@ bureaucratic, anything whose humour is dry. The one light-panelled palette here:
 near-white, text is near-black, and the keycap chip inverts to dark-on-light. Use it when the
 UI should feel like equipment rather than like a game.
 
+Being light-panelled is also what makes it the tightest palette here: a faint ink on a
+near-white panel has nowhere left to go. `TEXT_FAINT` was `Color(0.45, 0.51, 0.55)` and sat at
+exactly 3.00:1 on the reward card, so the card kicker was the first thing to disappear on a
+laptop screen; it is 0.41 now. The primary button's pressed state is still the narrowest pass
+in the file at 4.52:1. Do not lighten either of those without re-running the lint.
+
 ```gdscript
 const ACCENT: Color = Color(0.10, 0.62, 0.78)
 const ACCENT_DEEP: Color = Color(0.06, 0.42, 0.54)
 const TEXT: Color = Color(0.09, 0.13, 0.16)
 const TEXT_DIM: Color = Color(0.28, 0.34, 0.38)
-const TEXT_FAINT: Color = Color(0.45, 0.51, 0.55)
+const TEXT_FAINT: Color = Color(0.41, 0.47, 0.51)
 const PANEL_FILL: Color = Color(0.88, 0.92, 0.94, 0.72)
 const PANEL_FILL_DEEP: Color = Color(0.93, 0.96, 0.97, 0.92)
 const PANEL_BORDER: Color = Color(0.10, 0.20, 0.26, 0.22)
@@ -89,8 +95,15 @@ Horror. Near-black panels, a desaturated arterial red as the only saturated thin
 Survival horror, dungeon crawlers with teeth, anything where the HUD should feel like a warning
 rather than a readout.
 
+The accent is the one colour in this file that was set by measurement rather than by eye. At
+`Color(0.85, 0.18, 0.16)` it sat in the band where a saturated red takes neither black nor
+white ink — 4.14:1 with the light ink it gets, 4.02:1 with the dark one, and 3.47:1 once hover
+lightens the fill. Deepening it to 0.76 puts the primary button at 4.79:1 worst case. It is a
+visibly deeper red than it was; that is the price of the button under it being readable, and
+`palette_lint.py` will say so if you push it back.
+
 ```gdscript
-const ACCENT: Color = Color(0.85, 0.18, 0.16)
+const ACCENT: Color = Color(0.76, 0.14, 0.13)
 const ACCENT_DEEP: Color = Color(0.48, 0.09, 0.09)
 const TEXT: Color = Color(0.92, 0.87, 0.85)
 const TEXT_DIM: Color = Color(0.70, 0.63, 0.62)
@@ -190,3 +203,27 @@ accent's hue — a fully neutral panel under a strong accent is what makes a pal
 recolour rather than a design. Then check the two pairs named at the top. Sixteen constants is
 the whole job; if you find yourself wanting a seventeenth, the thing you actually want is
 probably derived, like `BACKDROP_OPAQUE`.
+
+Then measure it, because a palette that reads fine in a swatch strip can still be unreadable
+assembled:
+
+```bash
+python scaffold_ui.py /tmp/pal --only theme --palette mine --force
+python palette_lint.py /tmp/pal/scripts/ui --contrast-table
+```
+
+That prints all sixteen ink/surface pairs the kit renders, composited, with the bar each has
+to clear. Two things it will tell you that eyeballing will not:
+
+- **A mid-luminance saturated accent is the trap.** It takes neither black nor white ink. Reds
+  and oranges around 0.75-0.90 red are the whole failure band — `bloodmoon` lived there. The
+  symptom is a primary button that looks *fine* and measures 3.5:1, and it gets worse on hover
+  because hover lightens the fill under an ink that was already light. If the primary button
+  rows fail, deepen `ACCENT` until they pass; you cannot fix it from the ink side, because
+  `ui_theme.gd` already picks the better ink by measurement.
+- **A light-panelled palette has no room in the faint tier.** `TEXT_FAINT` on a near-white
+  panel is the first row to fail, and it is the row you are least likely to look at.
+
+Nothing in the kit measures the crosshair or a bare Glyph drawn over gameplay, because there
+is no surface behind them to measure against. If your game is bright, that is the place to
+check by eye rather than by number.
