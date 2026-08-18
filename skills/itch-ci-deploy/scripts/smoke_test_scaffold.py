@@ -56,6 +56,18 @@ def main():
         check("no placeholders left (GitHub ${{ }} expressions are not placeholders)", not re.search(r"\{\{[A-Z_]+\}\}", body), body)
         check("version substituted from config/features", "GODOT_VERSION: 4.7-stable" in body and "GODOT_TEMPLATE_DIR: 4.7.stable" in body, body)
         check("target substituted", "ITCH_TARGET: someone/probe:html5" in body, body)
+        # The credential guard is only worth having if it runs before the ~8 minutes of
+        # engine, templates and export it exists to save, so assert its POSITION, not just
+        # its presence. Checking that it is there says nothing about the thing it fixes.
+        steps = [i for i, ln in enumerate(body.splitlines()) if ln.strip().startswith("- name:")]
+        guard = [i for i, ln in enumerate(body.splitlines()) if "Check the itch.io credentials" in ln]
+        heavy = [i for i, ln in enumerate(body.splitlines())
+                 if ln.strip().startswith("- name:") and ("Download Godot" in ln or "Checkout" in ln)]
+        check("workflow guards an empty BUTLER_API_KEY", 'if [ -z "${BUTLER_API_KEY}" ]' in body, body)
+        check("the guard is the first step, before anything is downloaded",
+              bool(guard) and bool(steps) and guard[0] == steps[0] and all(guard[0] < h for h in heavy), body)
+        check("the guard is given the secret to test",
+              "BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}" in body.split("Checkout repository")[0], body)
         preset = (proj / "export_presets.cfg").read_text(encoding="utf-8")
         check("preset has thread_support=false", "variant/thread_support=false" in preset, preset)
 

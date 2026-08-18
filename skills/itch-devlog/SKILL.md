@@ -179,14 +179,20 @@ ta.value.length               // must be non-zero, or Save posts an empty devlog
 ```
 
 **Resolve the element; do not hard-code the class.** The two forms have been observed
-disagreeing: a live read of the store edit form returned `.redactor-in` on 2026-08-17,
-while this devlog form was recorded using `.redactor-layer`. Either itch runs two Redactor
-versions on the same site or one of those observations has gone stale — nobody has looked
-at a live devlog form since, and this guidance has **not** been verified against one. That
-unresolved question is the argument for the fallback chain rather than a reason to wait
-for an answer: whichever class is right today, the chain finds it, and the
-`[contenteditable="true"]` fallback catches a third one nobody has seen yet. Treat a
-`null` at `ed`, or a zero-length `ta.value`, as the bug — do not save through it.
+disagreeing — a live read of the store edit form returned `.redactor-in` on 2026-08-17,
+while this devlog form was recorded using `.redactor-layer`. Do not go and settle which
+one is "really" right: the chain above is the answer either way, and the answer expires.
+These class names belong to itch, not to us; a name read today can change on their next
+deploy, and two forms on the same site already disagree, which is the strongest evidence
+you will get that pinning one is the wrong move. So the chain is the design, not a
+workaround waiting on a measurement — whichever class is live it finds it, and the
+`[contenteditable="true"]` fallback catches a third nobody has seen yet.
+
+What that buys you is a **failure you can detect**. Treat a `null` at `ed`, or a
+zero-length `ta.value`, as the bug and stop — those are the two states that produce an
+empty post, and they are cheap to check. A hard-coded selector turns the same breakage
+into a silent one, because `querySelector` returning `null` reads exactly like a page
+that has not finished loading.
 
 ## Gotchas
 

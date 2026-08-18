@@ -27,6 +27,26 @@ jobs:
       ITCH_TARGET: {{ITCH_TARGET}}
 
     steps:
+    # First step on purpose. butler is the last thing this workflow runs, so a bad key
+    # is otherwise reported ~8 minutes in, after the engine, the templates and the export.
+    # It is checked here instead, before anything is downloaded, and the empty case is
+    # checked separately from the missing one because they are NOT the same mistake:
+    # `gh secret set NAME --repo owner/repo` in a shell with no terminal reads stdin,
+    # gets EOF, and stores an empty secret at exit 0. `gh secret list` then shows it
+    # present, and butler reports it exactly as if it had never been set.
+    - name: Check the itch.io credentials exist
+      env:
+        BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+      run: |
+        if [ -z "${BUTLER_API_KEY}" ]; then
+          echo "::error::BUTLER_API_KEY is unset or empty - butler cannot push, so this run would fail at the last step after a full export."
+          echo "Set it with a value on the command line; a bare 'gh secret set' with no terminal stores an EMPTY secret:"
+          echo "  gh secret set BUTLER_API_KEY --repo <owner/repo> --body \"\$KEY\""
+          echo "Generate the key at https://itch.io/user/settings/api-keys"
+          exit 1
+        fi
+        echo "BUTLER_API_KEY is present and non-empty (${#BUTLER_API_KEY} characters)."
+
     - name: Checkout repository
       uses: actions/checkout@v4
 

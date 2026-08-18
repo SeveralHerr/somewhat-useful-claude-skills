@@ -165,7 +165,9 @@ Resolve that element instead of trusting a remembered class. This table used to 
 `.redactor`, which as a CSS selector matches neither `redactor-in` nor `redactor-layer` —
 class selectors match whole tokens, not prefixes — so the old advice was at best a
 shorthand and at worst was querying nothing. `.redactor-in` is what a live read of the
-edit form returned on 2026-08-17; treat a `null` here as the bug, not the sync.
+edit form returned on 2026-08-17, and `itch-devlog` recorded `.redactor-layer` on the
+devlog form; both are in the chain because these class names are itch's to change and two
+forms on the same site already disagree. Treat a `null` here as the bug, not the sync.
 
 ### "The genre dropdown only has one option" / "my tag didn't stick"
 

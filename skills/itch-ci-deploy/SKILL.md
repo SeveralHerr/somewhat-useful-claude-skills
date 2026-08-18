@@ -70,6 +70,15 @@ The scaffolder writes the workflow; `itch-store-page` covers every click on the 
    normally `BUTLER_API_KEY: ***`, and an empty secret prints `BUTLER_API_KEY:` with nothing
    after it. Re-set it with `--body` and re-run.
 
+   The scaffolded workflow now checks this in its **first** step, before the engine, the
+   templates or the export — an empty or missing key fails in about ten seconds with an
+   `::error::` naming the `--body` fix, rather than eight minutes in at the butler push.
+   A workflow scaffolded before this was added does not have that step; re-scaffold with
+   `--force`, or copy the `Check the itch.io credentials exist` step out of
+   `<skill dir>/assets/deploy-to-itchio.yml` to the top of your `steps:`. It has to be
+   first to be worth anything — a guard sitting just above `Install Butler` is correct and
+   useless, since everything it was meant to save has already run.
+
 4. **Commit `export_presets.cfg` and the workflow, push to `main`.** Watch with
    `gh run watch` or `gh run list --workflow deploy-to-itchio.yml`. Force a run without a
    code change via `gh workflow run deploy-to-itchio.yml` (`workflow_dispatch` is wired).
@@ -139,7 +148,11 @@ Read `<skill dir>/assets/deploy-to-itchio.yml`; the comments carry the reasons. 
   an opaque string until the upload.
 - **`No credentials and stdin is not a terminal`, or `BUTLER_API_KEY:` printing blank in the
   log.** The secret exists but is empty — see step 3. `gh secret list` shows it present
-  either way; re-set it with `--body` and re-run.
+  either way; re-set it with `--body` and re-run. Reaching butler at all means the workflow
+  predates the first-step credential check, so re-scaffold while you are there.
+- **`BUTLER_API_KEY is unset or empty` in the first ten seconds.** That is the guard doing
+  its job, not a new problem — the same empty-secret mistake, caught before the run costs
+  anything. The fix is the same `--body` re-set.
 - **Green run, page renders, but the game behaves wrong.** The export is not the editor;
   see step 7. Suspect `OS.has_feature`/`is_debug_build` branches and autoload entry hooks
   before you suspect the pipeline, and never treat a green Actions run as a test of the
