@@ -40,11 +40,12 @@ For local development against a checkout instead of GitHub, point the marketplac
 | `enumerate-the-pairs` | Tests a claim about a *relation* — a precedence ladder, an override rule, a tie-break, a compatibility matrix — by looping the cross product instead of writing two or three examples. *n* members have *n²* ordered pairs, and the examples people write are the ones they were already thinking about. |
 | `extract-a-testable-seam` | Makes a behaviour assertable when it lives past a gate the suite never opens — headless, muted, animations-off, a platform branch. Everything past that gate is unreachable code to a headless runner, so the test asserts the early return and an obviously fatal mutation survives. Move the composition out; leave the gate where it is. |
 | `scope-vs-claim` | Compares what a check *says* it covers against what it actually covers. The code can fail; the sentence beside it cannot, so the two drift and the check reports clean forever. Five shapes with a cheap test each — including the commonest, a test name that claims more than its assertions check. |
+| `cycle` | A development loop that does not end: pre-flight reads, tracker items one at a time (confirm → claim → implement → verify → commit → close *against the acceptance*), add to the backlog, reflect on the tooling, reflect on the loop itself, refill the queue, bump the cycle log, go again. Its references carry the evidence behind every rule, how to read a gate's denominators rather than its exit code, and how to write the lane prompts and pay for the merge when a cycle fans out to agents in worktrees. |
 
-The last four are the odd ones out: no Godot, no itch, no assets. They are verification
-discipline — the ways a green check comes to mean nothing — and they apply to any repo in any
-language. The worked examples in them come from a Godot game because that is where they were
-paid for.
+The last five are the odd ones out: no Godot, no itch, no assets. Four are verification
+discipline — the ways a green check comes to mean nothing — and `cycle` is the loop that runs
+them. They apply to any repo in any language; the worked examples come from a Godot game
+because that is where they were paid for.
 
 Skills load themselves when they're relevant — you generally don't need to invoke them by name.
 Each one's `description` in its `SKILL.md` frontmatter is what Claude matches against.
