@@ -3,8 +3,9 @@
 A personal collection of [Claude Code](https://claude.com/claude-code) skills for indie game
 development, packaged as a plugin so they follow me between machines.
 
-Everything here is aimed at the same workflow: building small games in **Godot 4**, dressing them
-in **Kenney** art, and shipping them to **itch.io**.
+Most of it is aimed at the same workflow: building small games in **Godot 4**, dressing them
+in **Kenney** art, and shipping them to **itch.io**. Four of them are engine-agnostic
+verification discipline, and travel to any repo.
 
 ## Install
 
@@ -35,6 +36,15 @@ For local development against a checkout instead of GitHub, point the marketplac
 | `blender-mcp-modelling` | Models new 3D assets in a running Blender through the Blender MCP so they match an existing art style and actually load in the engine. Reads the palette and pivot convention out of the reference files, drives a build → render → look → fix loop, and gates the export against the reference set. |
 | `game-from-gibberish` | Turns keyboard mash — or a blank page — into a real small game. Rolls the design constraints on dice before any thinking happens, so the randomness actually steers instead of collapsing back into an endless runner. |
 | `skill-feedback-issue` | Sends a skill's own defects back here as a GitHub issue — resolves the installed plugin to its source repo *and to the cached tree that actually ran*, checks for a duplicate, and files what ran, what broke, the pinned version, and the proposed fix. This is what makes the collection self-improving. |
+| `derive-the-list` | Replaces a hand-typed list of cases — a lookup table, a needle list, "the ones that matter" — with one derived from the source of truth, and gates it in *both* directions, because the one-directional test everyone writes cannot see an entry the list is missing. Includes the case where deriving is wrong: a taste call, and a hand-typed list whose maintenance cost *is* the check. |
+| `enumerate-the-pairs` | Tests a claim about a *relation* — a precedence ladder, an override rule, a tie-break, a compatibility matrix — by looping the cross product instead of writing two or three examples. *n* members have *n²* ordered pairs, and the examples people write are the ones they were already thinking about. |
+| `extract-a-testable-seam` | Makes a behaviour assertable when it lives past a gate the suite never opens — headless, muted, animations-off, a platform branch. Everything past that gate is unreachable code to a headless runner, so the test asserts the early return and an obviously fatal mutation survives. Move the composition out; leave the gate where it is. |
+| `scope-vs-claim` | Compares what a check *says* it covers against what it actually covers. The code can fail; the sentence beside it cannot, so the two drift and the check reports clean forever. Five shapes with a cheap test each — including the commonest, a test name that claims more than its assertions check. |
+
+The last four are the odd ones out: no Godot, no itch, no assets. They are verification
+discipline — the ways a green check comes to mean nothing — and they apply to any repo in any
+language. The worked examples in them come from a Godot game because that is where they were
+paid for.
 
 Skills load themselves when they're relevant — you generally don't need to invoke them by name.
 Each one's `description` in its `SKILL.md` frontmatter is what Claude matches against.
