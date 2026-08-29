@@ -100,12 +100,31 @@ than a second hour of getting coordinates right.
 
 ```python
 import bmcp
-book = bmcp.build_mesh("Mesh crate", parts, collection="myasset")   # parts: [(material, verts, quads)]
+verts, quads = bmcp.box(0.0, 0.4, 0.0, 0.3, 0.0, 0.25)   # six scalars: min/max per axis,
+                                                          # NOT two corner tuples
+parts = [("wood", verts, quads)]   # material NAME, not the datablock `material_from_spec`
+                                   # hands back. Passing the object fails inside
+                                   # `bpy.data.materials.get` with an error that names
+                                   # neither materials nor the parameter, so it reads as
+                                   # a mesh problem.
+book = bmcp.build_mesh("Mesh crate", parts, collection="myasset")
 bmcp.preview_rig([book])          # camera + sun + fill + shadow floor, in its own collection
 bmcp.frame_camera(objs=[book])    # fits the camera to the bounding box
 ```
 
-Then `render_viewport_to_path` and **read the PNG back**. Looking is the point.
+Then render to a path you choose and **read the PNG back**. Looking is the point.
+
+```python
+scene = bpy.context.scene
+scene.render.filepath = r"<absolute path, no extension>"   # Blender appends the format's
+scene.render.image_settings.file_format = 'PNG'            # extension; a `//` path resolves
+bpy.ops.render.render(write_still=True)                    # against the .blend, which for
+                                                           # an unsaved file is a temp dir
+```
+
+The MCP's `get_viewport_screenshot` is **not** a substitute: it captures the viewport,
+which does not respect the camera `frame_camera` just aimed, so you end up judging a frame
+nothing set up.
 
 Two framing notes that cost a wasted render each time they're ignored:
 
@@ -115,6 +134,24 @@ Two framing notes that cost a wasted render each time they're ignored:
 - **Keep total light energy near 1.0 of irradiance.** Low-poly base colours run bright
   (Kenney's wood is 0.90/0.60/0.39). Over-light it and every surface clips to white and
   the palette vanishes. A washed-out render is nearly always this, not the materials.
+
+**If the question is "are these the right colours", stop tuning lights and use Workbench.**
+Judging a palette under EEVEE means oscillating between a front face in shadow and
+everything clipped to white — two renders spent on the lighting, none on the asset.
+Workbench is unlit, so a flat-shaded kit asset renders at exactly its authored albedo and
+there is nothing to tune:
+
+```python
+scene.render.engine = 'BLENDER_WORKBENCH'
+sh = scene.display.shading
+sh.light, sh.color_type, sh.show_cavity = 'STUDIO', 'MATERIAL', True
+```
+
+Workbench reads `material.diffuse_color` — the viewport display colour — and **not** the
+Principled BSDF. `material_from_spec` mirrors the base colour into both, but a material
+you build by hand with only the BSDF set renders pure white — which looks like materials
+that failed to survive, and sends you hunting in the wrong place. Switch back to EEVEE to
+judge form and shadow.
 
 Now iterate. Expect **two to four** renders for a simple prop. Look for the things
 geometry can't tell you: does the silhouette read as the object from a normal viewing

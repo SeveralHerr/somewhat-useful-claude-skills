@@ -137,12 +137,16 @@ def material_from_spec(name, base_color, metallic=0.0, roughness=1.0, backface_c
     """
     mat = bpy.data.materials.new(name=name)
     mat.use_nodes = True
+    rgba = tuple(base_color) if len(base_color) == 4 else tuple(base_color) + (1.0,)
     bsdf = mat.node_tree.nodes.get("Principled BSDF")
     if bsdf:
-        rgba = tuple(base_color) if len(base_color) == 4 else tuple(base_color) + (1.0,)
         bsdf.inputs["Base Color"].default_value = rgba
         bsdf.inputs["Metallic"].default_value = metallic
         bsdf.inputs["Roughness"].default_value = roughness
+    # Workbench and the solid-mode viewport read `diffuse_color`, not the BSDF. Setting
+    # only the node leaves both showing pure white, which reads as "the model imported
+    # untextured" rather than "the render engine is looking somewhere else".
+    mat.diffuse_color = rgba
     mat.use_backface_culling = backface_cull
     return mat
 

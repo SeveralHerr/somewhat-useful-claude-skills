@@ -1,7 +1,7 @@
 {
   "name": "somewhat-useful-claude-skills",
-  "version": "0.19.0",
-  "description": "A personal collection of Claude Code skills for indie game development: Godot 4 in-game UI (static and animated), numeric placement audits for 2D and 3D scenes, itch.io store pages, devlogs and CI deploys, Kenney asset kit conventions, modelling new 3D assets in Blender through the MCP, a seeded method for generating games out of keyboard mash, and a feedback loop that files each skill's own defects back as a GitHub issue — plus five engine-agnostic skills for the ways a green check comes to mean nothing and the development loop that runs them: deriving a list instead of typing it, enumerating the pairs of a precedence rule, extracting a testable seam from behind a capability gate, auditing what a check says it covers against what it does, and an unending cycle of confirm, implement, verify, reflect and refill.",
+  "version": "0.21.0",
+  "description": "A personal collection of Claude Code skills for indie game development: Godot 4 in-game UI (static and animated), numeric placement audits for 2D and 3D scenes, itch.io store pages, devlogs and CI deploys, Kenney asset kit conventions, modelling new 3D assets in Blender through the MCP, a seeded method for generating games out of keyboard mash, and a feedback loop that files each skill's own defects back as a GitHub issue — plus five engine-agnostic skills for the ways a green check comes to mean nothing and the development loop that runs them: deriving a list instead of typing it, enumerating the pairs of a precedence rule, extracting a testable seam from behind a capability gate, auditing what a check says it covers against what it does, and an unending cycle of confirm, implement, verify, reflect and refill — plus a blunter beads-driven loop that works a Godot project off a fixed checklist until you interrupt it.",
   "author": {
     "name": "James Herr"
   },
@@ -35,6 +35,7 @@
     "workflow",
     "loop",
     "agents",
-    "worktree"
+    "worktree",
+    "beads"
   ]
 }
