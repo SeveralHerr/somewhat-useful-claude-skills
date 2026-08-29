@@ -16,12 +16,18 @@ present as a *plausible* result, which is exactly why they cost time.
 
 ## Renders
 
-**The render tool returns a different path from the one I passed.**
-It often does. `render_viewport_to_path` may write into Blender's own temp directory and
-report that location back in `filepath`. Always open the path in the **response**, not the
-one in your request — otherwise you read a stale file from a previous render, or nothing
-at all, and then "fix" a problem that no longer exists. This is the single easiest way to
-waste an iteration.
+**The PNG isn't where I told Blender to put it.**
+`scene.render.filepath` is not a filename. Blender appends the extension for the current
+`image_settings.file_format`, so `.../look.png` becomes `look.png.png`; and a path
+beginning `//` is *relative to the .blend file*, which for an unsaved session is a temp
+directory. Set an absolute path with no extension. Reading the wrong file here means you
+judge a stale render from the previous pass and "fix" a problem that no longer exists,
+which is the single easiest way to waste an iteration.
+
+**The render doesn't match the camera I just framed.**
+You captured the viewport, not the camera. `get_viewport_screenshot` shows whatever the
+Blender window is pointed at, which `bmcp.frame_camera` does not touch. Render with
+`bpy.ops.render.render(write_still=True)` (SKILL.md §4).
 
 **Blank frame, or floor and background only.**
 Almost always framing. Assets are frequently a fraction of a unit across, so a camera
@@ -32,6 +38,12 @@ excluded from the view layer, and that `hide_render` is not still set from an ea
 **Everything is black.**
 No light, world strength at 0, or the camera is inside geometry looking at backfaces
 (which are invisible when backface culling is on). Add the preview rig and re-frame.
+
+**Everything is flat white, but only under Workbench.**
+Workbench and the solid-mode viewport read `material.diffuse_color`, not the Principled
+BSDF, so a material with only the BSDF set has no colour as far as they are concerned.
+`bmcp.material_from_spec` sets both; a hand-rolled material usually doesn't. This reads as
+"the materials didn't survive", which is a different and much longer hunt.
 
 **Washed out — pale, colours barely distinguishable.**
 Over-lighting, not the materials. Low-poly kit base colours run bright (Kenney's wood is
