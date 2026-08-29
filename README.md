@@ -5,7 +5,8 @@ development, packaged as a plugin so they follow me between machines.
 
 Most of it is aimed at the same workflow: building small games in **Godot 4**, dressing them
 in **Kenney** art, and shipping them to **itch.io**. Four of them are engine-agnostic
-verification discipline, and travel to any repo.
+verification discipline, and travel to any repo; two more are development loops that run
+those checks over and over until you stop them.
 
 ## Install
 
@@ -41,6 +42,7 @@ For local development against a checkout instead of GitHub, point the marketplac
 | `extract-a-testable-seam` | Makes a behaviour assertable when it lives past a gate the suite never opens — headless, muted, animations-off, a platform branch. Everything past that gate is unreachable code to a headless runner, so the test asserts the early return and an obviously fatal mutation survives. Move the composition out; leave the gate where it is. |
 | `scope-vs-claim` | Compares what a check *says* it covers against what it actually covers. The code can fail; the sentence beside it cannot, so the two drift and the check reports clean forever. Five shapes with a cheap test each — including the commonest, a test name that claims more than its assertions check. |
 | `cycle` | A development loop that does not end: pre-flight reads, tracker items one at a time (confirm → claim → implement → verify → commit → close *against the acceptance*), add to the backlog, reflect on the tooling, reflect on the loop itself, refill the queue, bump the cycle log, go again. Its references carry the evidence behind every rule, how to read a gate's denominators rather than its exit code, and how to write the lane prompts and pay for the merge when a cycle fans out to agents in worktrees. |
+| `iterate-forever` | The blunt version of `cycle`, for a Godot project tracked in beads: a fixed per-session checklist — compile, implement, refactor anything over 500 lines, update the tests, run the game, fold what you learned back into the skills, refill the beads — then clear the list and take the next bead. No confirm step and no acceptance check; reach for `cycle` when you want those. |
 
 The last five are the odd ones out: no Godot, no itch, no assets. Four are verification
 discipline — the ways a green check comes to mean nothing — and `cycle` is the loop that runs

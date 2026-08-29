@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-A content repository, not an application: ten Claude Code skills for indie game development
+A content repository, not an application: sixteen Claude Code skills for indie game development
 (Godot 4 UI, itch.io publishing and CI deploy, Kenney assets, Blender asset authoring, seeded game design, and a
 self-improvement loop), packaged as one installable plugin. There is nothing to build, no dependency
 manifest, and no test runner. The deliverable is Markdown plus a handful of standalone scripts.
