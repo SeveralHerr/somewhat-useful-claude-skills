@@ -1,0 +1,17 @@
+{
+  "skill_name": "jamcraft-splash",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I just started a new Godot 4 game in this folder — main scene is scenes/title_screen.tscn. Can you add my Jamcraft logo so it shows when the game starts, before the title?",
+      "expected_output": "Copies jamcraft_splash.gd into the project's scripts folder and the logo to res://images/jamcraft_logo.png; picks pattern A (new boot splash scene whose JamcraftSplash root has next_scene = res://scenes/title_screen.tscn by path) and updates run/main_scene, or pattern B with the title menu hidden until finished; runs a headless import + quit-after check with no script errors and inspects write-movie frames showing the logo then the title.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "our title scene already plays music and loads the save in _ready. put the studio intro on top of it so the menu only becomes clickable after the logo is gone. there's an old TextureRect logo splash in there too, get rid of it",
+      "expected_output": "Uses pattern B: in the title scene's _ready, hides/disables the menu, adds JamcraftSplash.new() as a child, awaits finished, then shows and focuses the menu; removes the old TextureRect splash and its code so the logo is not shown twice; leaves run/main_scene unchanged; verifies headlessly and with a few write-movie frames, then deletes the frames.",
+      "files": []
+    }
+  ]
+}
