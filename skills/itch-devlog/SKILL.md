@@ -15,7 +15,8 @@ noise, and the reader learns the log is not worth opening tomorrow.
 So the target is deliberately, uncomfortably small:
 
 - **Title** — names the single most interesting thing. Not "Devlog #7", not the date.
-- **One lead sentence**, optional. Skip it if the bullets speak for themselves.
+- **One lead sentence**, optional. Skip it if the bullets speak for themselves. It is the
+  developer talking to players — never "you asked for…" (see **Voice** below).
 - **3–6 bullets**, each under ~10 words, each something a *player* would notice.
 - **One screenshot.**
 
@@ -85,6 +86,30 @@ registry".
 Never invent a feature to pad the list, and never soften a fix into a feature. If the
 day was genuinely one bug fix, the devlog is one bullet — that is an honest post and
 readers trust it more than a padded one.
+
+## Voice: the developer talking to their players
+
+The post is written *by the developer, for the game's audience* — not by you, for the
+person in this chat. The session that produced today's work is full of requests: "add
+more shortcuts", "the torch is too dark", a screenshot with circles on it. None of that
+is the reader's context. Carry it into the post and the devlog reads like a support
+ticket being closed, addressed to someone the reader has never met.
+
+So nothing in the title, lead or bullets refers to the conversation or to who asked:
+
+| Leaks the session | Speaks to the audience |
+|---|---|
+| You asked for more ways through the maze. Here they are. | The mazes now have far more ways through. |
+| As requested, the torch is brighter | Brighter torchlight in the corridors |
+| Per playtest feedback, flasks are easier to grab | Oil flasks are easier to pick up |
+| Fixed the bug you reported with the map | The map no longer opens on the wrong floor |
+
+The tells to scan for before saving: **you asked / you wanted / as requested / per your
+feedback / playtesting said / by request / you'll be glad to hear**. "You" is fine only
+when it means the player in the game ("you can now sprint") — never the person
+directing the work. Credit a real public request only when there is one to point at (a
+comment on the page, a jam rating), and name it as such; a private instruction in this
+session is not community feedback.
 
 ## The screenshot
 
