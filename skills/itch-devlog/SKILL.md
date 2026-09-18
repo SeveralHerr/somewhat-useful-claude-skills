@@ -185,6 +185,22 @@ The captured input keeps its change listener after being moved, so the upload pr
 exactly as if the dialog had been used. Do the attachment and the cover as two separate
 captures.
 
+**Two lines above are load-bearing in ways that do not look it.** Measured on the devlog
+form, 2026-09-17:
+
+- **Do not guard the `appendChild` on `isConnected`.** The captured input is *already* in
+  the document — itch parents it to `<html>`, so `inp.isConnected` is `true` and an
+  `if (!inp.isConnected)` wrapper, which is the natural thing to write around a move,
+  skips it every time. Being connected is not the problem; being a sibling of `<body>`
+  with a zero rect is, and `find` cannot return what has no box. Move it unconditionally.
+- **Keep `style.cssText = '...'` as a whole-string assignment.** The widget ships the
+  input with an *inline* `style="display: none;"`, and assigning `cssText` replaces the
+  whole inline declaration, which is what clears it. Refactoring that one line into
+  `inp.style.position = 'fixed'` and friends — the obvious tidy-up — leaves the inline
+  `display: none` standing, the element keeps its zero rect, `find` returns nothing, and
+  the failure looks like the capture not working rather than like a styling bug. If you
+  prefer the property form, set `inp.style.display = 'block'` explicitly.
+
 **Never hand-carry image bytes through a JS string.** Pasting a base64 PNG into
 `javascript_tool` and building a `File` from it *looks* like it works: the upload
 succeeds, itch returns an image id, and the byte count can even match — but one wrong
@@ -256,15 +272,21 @@ ta.value = ed.innerHTML;      // the half that is actually submitted
 ta.value.length               // must be non-zero, or Save posts an empty devlog
 ```
 
-**Resolve the element; do not hard-code the class.** The two forms have been observed
-disagreeing — a live read of the store edit form returned `.redactor-in` on 2026-08-17,
-while this devlog form was recorded using `.redactor-layer`. Do not go and settle which
-one is "really" right: the chain above is the answer either way, and the answer expires.
-These class names belong to itch, not to us; a name read today can change on their next
-deploy, and two forms on the same site already disagree, which is the strongest evidence
-you will get that pinning one is the wrong move. So the chain is the design, not a
-workaround waiting on a measurement — whichever class is live it finds it, and the
-`[contenteditable="true"]` fallback catches a third nobody has seen yet.
+**Resolve the element; do not hard-code the class.** The two names were once recorded as
+two forms disagreeing — `.redactor-in` off the store edit form on 2026-08-17,
+`.redactor-layer` off this one. A live read of the devlog form on 2026-09-17 says that was
+never a disagreement: both selectors return the **same element**, whose class list is
+`redactor-layer redactor-styles redactor-layer-img-edit redactor-in`. Two names on one
+node, read on two days, and written down as a conflict.
+
+That correction is not a reason to pin either name — it is the reason the chain stays.
+Had the earlier note been acted on rather than left open, the "losing" selector would have
+been deleted from a form that carries both, for a form nobody re-measured. These class
+names belong to itch, not to us; the class list above is four deep and any of it can move
+on their next deploy. So the chain is the design, not a workaround waiting on a
+measurement — whichever class is live it finds it, and the `[contenteditable="true"]`
+fallback catches a name nobody has seen yet. (The store form has *not* been re-read since
+2026-08-17, so nothing here says what it carries today.)
 
 What that buys you is a **failure you can detect**. Treat a `null` at `ed`, or a
 zero-length `ta.value`, as the bug and stop — those are the two states that produce an
