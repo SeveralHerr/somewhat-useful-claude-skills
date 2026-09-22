@@ -30,7 +30,7 @@ does not go here.
    dashboard. Every step below depends on it; if the extension refuses, stop and ask the
    user to allow the site *before* typing anything into a form you cannot finish.
 1. Pick the project and get its id (below).
-2. Read the day's work from git and translate it (below).
+2. Read the day's work from git, **check it is actually playable**, and translate it (below).
 3. Capture a screenshot that shows one of the things you just listed.
 4. Fill the form, upload the image, **strip every file/build attachment**, **save as a draft**.
 5. Reload the saved post and confirm the image actually *loads* (below).
@@ -66,6 +66,40 @@ git log --since="6am" --pretty=format:"%s" --no-merges
 
 Widen to `--since="yesterday"` if that comes back thin — people commit at odd hours,
 and an empty log more often means an early morning than a day with no work.
+
+### Committed is not deployed, and `git log` cannot tell the difference
+
+**Check what the live build actually contains before you write a word about it.** The
+command above lists commits. A devlog describes a *game people can open*. Those are the
+same thing only when today's work has reached itch, and on a project that deploys from
+CI on pushes to one branch, it routinely has not: measured on A-MAZE, 2026-09-22, the
+day's work sat on a feature branch and the playable build was **50 commits behind**.
+Every bullet the git log suggested was true of the repository and false of the game.
+Nothing in the log hints at this — a commit looks identical whether it shipped or not.
+
+Two reads settle it, and the second is the one that counts:
+
+```bash
+git rev-list --count <deploy-branch>..HEAD     # 0 means today's work is on the branch that ships
+gh run list --branch <deploy-branch> --limit 1 # and that its deploy actually succeeded
+```
+
+Then confirm on itch, because the repository's opinion of what shipped is not evidence
+that itch received it. The devlog form's own **Files** tab lists each uploaded build with
+its commit and age — ground truth, one read, on the page you are already on:
+
+```js
+[...document.querySelectorAll('.upload_row, tr, li')]
+  .map(r => r.textContent.replace(/\s+/g, ' ').trim())
+  .filter(t => /\.zip|\.love|\.apk/.test(t)).slice(0, 4)
+// "a-maze-html5.zip 9ba77d2 a minute ago"   <- today's
+// "a-maze-html5.zip 7c400ab 5 days ago"     <- what players had until today
+```
+
+If today's work is not live, **say so and stop** — deploying is the user's call, not a
+step you take to make your own post true. Ask whether to ship it or to write the post as
+upcoming work. Publishing a devlog about features nobody can reach is the one mistake
+here that followers actually notice, because they go and look.
 
 Then **translate, don't transcribe.** Commit subjects are written for the person who
 will `git bisect` next month; they name files, systems and internal decisions. A player
@@ -326,5 +360,6 @@ that has not finished loading.
 - **Never attach files or builds to a devlog** — not even ones itch pre-attaches, and not
   when the user pushed a build today. The game page is where downloads live; a devlog
   carries text and one screenshot. Remove any `upload`/`build` attachment you find.
-- **Don't flip the project's visibility.** If today's work isn't deployed, say so rather
-  than implying it is live.
+- **Don't flip the project's visibility, and don't deploy to make a post true.** Shipping
+  is a separate decision from writing about it. If today's work isn't deployed, say so and
+  ask — see *Committed is not deployed*, which is how you find out rather than assume.
