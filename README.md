@@ -44,10 +44,14 @@ For local development against a checkout instead of GitHub, point the marketplac
 | `cycle` | A development loop that does not end: pre-flight reads, tracker items one at a time (confirm → claim → implement → verify → commit → close *against the acceptance*), add to the backlog, reflect on the tooling, reflect on the loop itself, refill the queue, bump the cycle log, go again. Its references carry the evidence behind every rule, how to read a gate's denominators rather than its exit code, and how to write the lane prompts and pay for the merge when a cycle fans out to agents in worktrees. |
 | `iterate-forever` | The blunt version of `cycle`, for a Godot project tracked in beads: a fixed per-session checklist — compile, implement, refactor anything over 500 lines, update the tests, run the game, fold what you learned back into the skills, refill the beads — then clear the list and take the next bead. No confirm step and no acceptance check; reach for `cycle` when you want those. |
 | `jamcraft-splash` | Adds the Jamcraft studio logo intro to a Godot 4 game — one self-contained `JamcraftSplash` script plus the logo PNG. The logo pops in with a flash, holds and fades in about 1.6 s, can be skipped with any input, and hands off to the title screen either as the main scene or as an overlay. |
+| `module-gauntlet` | Builds a multi-module game or app through a scored gauntlet run by the Workflow tool: a builder in its own worktree, a critic that merges and scores it out of 10 against a written contract, revise rounds until it clears 8.5 with no open high or medium, and a gatekeeper that commits only on green. One module per run, or a whole feedback batch in one run with a screenshot validation loop and a final security and completeness gate. The script is parameterized; the SKILL.md carries the lessons that made it work, such as floors from targets rather than measurements. |
+| `prompt-from-reference-game` | Writes the build prompt for a new game that reuses an existing game's assets, style and process rules: opens the reference repo instead of describing it, gates on asset licences, and keeps only the constraints the building agent cannot discover for itself. |
+| `mockup-on-screenshot` | Mocks up game feature and art ideas by overlaying the real sprites on a real screenshot at measured landmarks, puts art "behind" the playfield with a clip-path re-layer, and renders every artboard locally before it is published, looking for occluded props, low contrast and clipped text. |
 
 The last five are the odd ones out: no Godot, no itch, no assets. Four are verification
 discipline — the ways a green check comes to mean nothing — and `cycle` is the loop that runs
-them. They apply to any repo in any language; the worked examples come from a Godot game
+them. `module-gauntlet` is engine-agnostic too: a scored multi-agent build loop that leans on
+the same checks. They apply to any repo in any language; the worked examples come from a Godot game
 because that is where they were paid for.
 
 Skills load themselves when they're relevant — you generally don't need to invoke them by name.

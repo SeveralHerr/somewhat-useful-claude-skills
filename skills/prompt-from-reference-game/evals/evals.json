@@ -1,0 +1,17 @@
+{
+  "skill_name": "prompt-from-reference-game",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Make me a prompt for a new game called space-ball that uses the assets from my ../StarRunner repo. Follow the style of the prompt in StarRunner's README.",
+      "expected_output": "Reads the README template prompt verbatim and keeps its section order; opens ../StarRunner and names real asset paths, fonts and motion numbers from its title scene rather than describing a style; checks whether a space-ball repo or folder exists and states the assumption if the name does not match; greps the asset folders for licence files and adds a CREDITS requirement plus a test that fails on an uncredited asset; folds StarRunner's CLAUDE.md/AGENTS.md process rules into the prompt; saves the prompt to the scratchpad and shows it inline without writing into either repo.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "This prompt you wrote tells the agent to run /module-gauntlet and to use the Kenney pack in assets/paid/, and it lists every file the game should have. The new repo is public. Fix it.",
+      "expected_output": "Replaces the /module-gauntlet reference with the process spelled out in a few lines (or an install step), since the new repo lacks that skill; checks the paid pack's licence and removes it or blocks it from the public repo if redistribution is forbidden; removes the hard-coded file inventory and module list, keeping only constraints the agent cannot discover (asset paths, licences, gates, pass marks, deploy target).",
+      "files": []
+    }
+  ]
+}

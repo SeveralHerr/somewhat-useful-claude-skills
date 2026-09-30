@@ -68,6 +68,11 @@ def main():
               bool(guard) and bool(steps) and guard[0] == steps[0] and all(guard[0] < h for h in heavy), body)
         check("the guard is given the secret to test",
               "BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}" in body.split("Checkout repository")[0], body)
+        # The stamp is only useful inside what butler uploads: after the export exists,
+        # before the push. Assert the order, not just the line.
+        stamp = body.find('> "${EXPORT_DIR}/version.txt"')
+        check("build is stamped with its commit between export and push",
+              body.find("Export project") < stamp < body.find("butler push"), body)
         preset = (proj / "export_presets.cfg").read_text(encoding="utf-8")
         check("preset has thread_support=false", "variant/thread_support=false" in preset, preset)
 

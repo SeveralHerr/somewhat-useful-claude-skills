@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-A content repository, not an application: seventeen Claude Code skills for indie game development
+A content repository, not an application: twenty Claude Code skills for indie game development
 (Godot 4 UI, itch.io publishing and CI deploy, Kenney assets, Blender asset authoring, seeded game design, and a
 self-improvement loop), packaged as one installable plugin. There is nothing to build, no dependency
 manifest, and no test runner. The deliverable is Markdown plus a handful of standalone scripts.
@@ -26,6 +26,11 @@ python skills/itch-store-page/scripts/store_art.py palette|cover|banner --src sh
 python skills/itch-ci-deploy/scripts/scaffold_itch_deploy.py <godot project> --target user/game:html5 [--check]
 python skills/itch-ci-deploy/scripts/smoke_test_scaffold.py                     # SMOKE: ALL PASS; proves the checks can fail
 ```
+
+`module-gauntlet/scripts/gauntlet.workflow.js` runs only under Claude Code's Workflow tool, not
+from a shell. To check an edit, dry-run it in Node with `agent`/`phase`/`log`/`args` stubbed
+(strip `export` from `meta` and wrap the body in an `AsyncFunction`) and assert the call
+sequence for a single module, a batch with validation and final gate, and the revise cap.
 
 `tools/` is repo maintenance — the only scripts here that do **not** ship to a user:
 
@@ -108,7 +113,7 @@ prove it can exit non-zero before you trust it.
 
 `skills/godot-game-ui/evals/evals.json` is a `skill-creator` eval set (`skill_name` + `evals[]`
 of `prompt` / `expected_output` / `assertions`); run it through the `skill-creator` skill. It is
-the only skill with evals — new eval sets should follow that file's shape.
+the template the other eval sets follow — new eval sets should use that file's shape.
 
 ## Architecture
 

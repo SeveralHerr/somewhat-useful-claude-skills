@@ -1,0 +1,17 @@
+{
+  "skill_name": "mockup-on-screenshot",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Show me some concepts for where the big statue from my main game could go in this pinball spin-off. Make it a shareable page.",
+      "expected_output": "Finds the statue's actual sprite file in the main game's repo (grepping scene files to confirm which texture is the statue) rather than redrawing it; bases each concept on a fresh real screenshot of the pinball game; records landmark coordinates in CSS px and places overlays against them; offers gameplay and purely aesthetic concept rows; uses a clip-path re-layer of the screenshot for any 'behind the table' concept; renders every artboard locally in headless Chrome with local file paths, checks for occluded props, low contrast and clipped text, fixes and re-renders before publishing.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "The mockup page I published shows broken image icons and one concept's logo is hidden under the HUD bar. Fix it.",
+      "expected_output": "Builds a local preview copy that strips host runtime wrappers and swaps uploaded-asset URLs for local files via an id-to-file map, renders it headlessly to reproduce the broken images, re-uploads or re-references the missing assets, moves the logo using the measured landmark table so it clears the HUD, re-renders to confirm both fixes, then republishes.",
+      "files": []
+    }
+  ]
+}

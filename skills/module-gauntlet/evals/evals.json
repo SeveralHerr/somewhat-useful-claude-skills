@@ -1,0 +1,23 @@
+{
+  "skill_name": "module-gauntlet",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "PROMPT.md says to build the game one module per workflow: builder in a worktree, critic scores out of 10, revise until 8.5, then gate and commit. ARCHITECTURE.md and docs/STATUS.json are written but not committed yet. Start with the physics module.",
+      "expected_output": "Commits the contract and STATUS scaffold on a non-deploying branch before launching anything (worktrees branch from HEAD); runs gauntlet.workflow.js via the Workflow tool with args.repo, args.branch and a single-module args.modules entry whose spec is the physics section's measurable done-means; does not hard-code a repo path in the script; after the run reads the result, checks git worktree list, and fixes any open medium itself with a regression test rather than launching another revise round.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Playtest feedback: the score shows twice, the combo banner covers the bumpers, and there's a dark smudge above the drain that looks like the ball draining. Run it through the lite gauntlet.",
+      "expected_output": "Takes baseline gates and screenshots first and maps each complaint to an image region; branches off the deploying branch; writes one contract section plus one STATUS entry per complaint and commits; launches one Workflow run with three modules ordered layout, overlays, renderer, each spec quoting the user's words and naming baseline images and before/after measurements (e.g. drain-gap luminance), maxRevise 2, a visual command, valPasses, and a finalGate listing the three asks; afterwards reports per-ask proof and does not merge to the deploying branch without the user's go-ahead.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "The critic passed the table module at 8.7 but the ramp now gets way fewer shots than before. The builder changed the validator floor in the same commit. What went wrong and how do I stop it happening again?",
+      "expected_output": "Explains that the floor was set from the regressed measurement instead of from a target, so the gate measured the builder against itself; recommends restoring the floor from the previous round's count, putting before/after flow counts in every geometry spec with the floor declared immutable, and bisecting the regression by reverting one geometry change at a time in a scratch copy and re-running the validator.",
+      "files": []
+    }
+  ]
+}

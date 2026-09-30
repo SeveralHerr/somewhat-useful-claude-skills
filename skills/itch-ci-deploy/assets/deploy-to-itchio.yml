@@ -126,6 +126,13 @@ jobs:
         fi
         ls -la "${EXPORT_DIR}"
 
+    # A stamp the LIVE embed can be asked for. `butler status` proves the channel got
+    # this commit; only fetching <embed dir>/version.txt from the itch.zone URL a player
+    # (or a health check) actually loads proves that URL serves it. The embed path
+    # changes on every push, so a check pinned to an old one stays green on an old build.
+    - name: Stamp the build with its commit
+      run: echo "${GITHUB_SHA}" > "${EXPORT_DIR}/version.txt"
+
     - name: Install Butler
       run: |
         curl -L -o butler.zip https://broth.itch.zone/butler/linux-amd64/LATEST/archive/default
