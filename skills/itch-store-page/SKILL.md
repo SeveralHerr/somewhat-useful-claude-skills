@@ -33,7 +33,11 @@ Two separate editors, and people conflate them:
 - **The game page itself, `<user>.itch.io/<slug>`** → the **Edit theme** bar → colours,
   fonts, screenshot placement, banner / background / embed-bg images.
 
-Find `<id>` from `itch.io/dashboard`: each project's Edit link is `/game/edit/<id>`.
+Find `<id>` from `itch.io/dashboard`: each project's Edit link is `/game/edit/<id>`. Read
+the public URL from the same place — the dashboard's or edit form's **View page** link —
+rather than building it. `<user>` is the account's username, not the studio or brand the
+game is published as: a guessed `<studio>.itch.io/<slug>` came back "We couldn't find your
+page", which reads as an unpublished or deleted game when it is only the wrong subdomain.
 
 ## Workflow
 
@@ -99,10 +103,12 @@ window.__target.dispatchEvent(new Event('change', { bubbles: true }));
 ```
 
 Wait ~5s, then confirm the hidden id field is populated. **Restore
-`HTMLInputElement.prototype.click` and remove the shim before saving**, or a later real
-click silently does nothing.
+`HTMLInputElement.prototype.click` and remove the shim when the upload is done** (before
+any Save), or a later real click silently does nothing.
 
-Screenshots accept all files in one go; cover and banner are single.
+Screenshots accept all files in one go; cover and banner are single. Screenshot uploads
+and deletes persist server-side the moment they finish — no Save press, confirmed by
+reload — so a half-run script leaves a half-changed gallery, not a discarded draft.
 
 ### Replacing an image that is already set
 
@@ -118,9 +124,45 @@ The two single-image widgets behave in opposite ways, so the rule is per widget:
 - **Theme editor, banner** — inverted. With an image set, the only control offered is
   **Remove image**; `Upload` does not reappear until after it. That path is safe — no
   dialog, no hang — so removing first is required rather than forbidden.
+- **Edit form, screenshots** — there is no replace; each row's `.delete_screen_btn` is the
+  only way out, and it calls the same native `confirm("Are you sure you want to delete
+  this screenshot?")`. Here you cannot avoid the dialog, so pre-answer it (below).
 
 Read the widget before acting rather than carrying one habit to the other: "which button
 is present" is the question, and the answer differs between the two editors.
+
+### Replacing screenshots
+
+Only with the user's go-ahead to delete (see Boundaries). Then:
+
+1. **Upload the replacements first**, then poll until `input[name^="screenshot["]` holds
+   old + new ids (5 × ~900 KB took ~25s). Deleting first means a failed upload leaves the
+   live page with no screenshots at all — and since nothing waits for Save, that is
+   immediately public.
+2. **Delete the old rows with `confirm` stubbed**, recording what it was asked, then
+   restore it:
+
+```js
+// oldIds: the screenshot ids read BEFORE step 1. Row = nearest ancestor holding a delete btn.
+const rowFor = (id) => document.querySelector(`input[name="screenshot[${id}][position]"]`)
+  .closest(':has(.delete_screen_btn)');
+const log = [], origConfirm = window.confirm;
+window.confirm = (m) => { log.push(m); return true; };
+try {
+  for (const id of oldIds) {   // one at a time: each delete is a request plus a re-render
+    rowFor(id).querySelector('.delete_screen_btn').click();
+    await new Promise(r => setTimeout(r, 2500));
+  }
+} finally { window.confirm = origConfirm; }
+log.length === oldIds.length   // proof each delete really asked, and was answered
+```
+
+   The log is the evidence: an empty one means you clicked something that was not the
+   delete control, not that the delete was dialog-free.
+3. **Reload and check the order.** The gallery sorts by upload id, which is the order the
+   uploads *completed*, not the order the files were selected — one large file finishing
+   last moves to the end. If order matters, fix it afterwards with the Move up/down
+   controls (or the `screenshot[<id>][position]` fields plus Save).
 
 ## Field reference
 
@@ -278,7 +320,9 @@ save is usually sparse and photographs as an empty field. If the project has a d
 bridge, use it to grant resources, unlock areas and move the player somewhere dense
 before grabbing frames, and hide the HUD for the cover (a store cover wants game pixels,
 not UI) while leaving it visible for the gallery shots, which should show the real
-interface.
+interface. If the project already has a headless screenshot tool that renders the real
+build, prefer it to hand captures: it is repeatable, and it doubles as a smoke gate — a run
+that logs errors should not supply frames, so the store never advertises a broken build.
 
 Build the theme from `palette` output rather than taste: colours lifted from the game's
 own art make the page read as an extension of it, and they will not clash with the
@@ -304,6 +348,9 @@ background — palette mid-tones are usually too dim and need lightening.
   or timed out at 30s often enough to mislead — a blank frame looks like an empty form and
   invites you to re-do work that already landed. Verify with JS reads of the actual field
   values (and a reload) and keep screenshots for the rendered public page.
+- **The public gallery is lazy-loaded.** `.screenshot_list img` report 0×0 and
+  `naturalWidth` 0 until scrolled into view, so measuring straight after load says a
+  working gallery is broken. Scroll `.screenshot_list` into view, wait, then measure.
 
 ## Boundaries
 
@@ -314,7 +361,9 @@ Some fields on this form are declarations by the user, not styling:
 - **AI generation disclosure** — a required statement about how the game was made, with
   policy weight. If it is already answered, do not touch it. If it is blank, ask; do not
   answer on the user's behalf.
-- **Pricing** and **deleting existing uploads or images** — confirm first.
+- **Pricing** and **deleting existing uploads or images** — confirm first. An explicit
+  request ("replace the screenshots", "remove the old ones") is that confirmation; stubbing
+  `confirm()` answers itch's dialog, never the user's.
 
 Everything else (copy, tags, theme, adding art) is ordinary work; just report what you
 changed and verify it after a reload.
