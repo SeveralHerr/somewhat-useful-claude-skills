@@ -43,6 +43,7 @@ For local development against a checkout instead of GitHub, point the marketplac
 | `scope-vs-claim` | Compares what a check *says* it covers against what it actually covers. The code can fail; the sentence beside it cannot, so the two drift and the check reports clean forever. Five shapes with a cheap test each — including the commonest, a test name that claims more than its assertions check. |
 | `cycle` | A development loop that does not end: pre-flight reads, tracker items one at a time (confirm → claim → implement → verify → commit → close *against the acceptance*), add to the backlog, reflect on the tooling, reflect on the loop itself, refill the queue, bump the cycle log, go again. Its references carry the evidence behind every rule, how to read a gate's denominators rather than its exit code, and how to write the lane prompts and pay for the merge when a cycle fans out to agents in worktrees. |
 | `iterate-forever` | The blunt version of `cycle`, for a Godot project tracked in beads: a fixed per-session checklist — compile, implement, refactor anything over 500 lines, update the tests, run the game, fold what you learned back into the skills, refill the beads — then clear the list and take the next bead. No confirm step and no acceptance check; reach for `cycle` when you want those. |
+| `playthrough-video-review` | Records a scripted 100% playthrough of your game as a share-size MP4 — Godot movie mode, or headless Chrome on a virtual clock for web games so the footage is smooth however slowly the page rasters — reads it as timecode-labelled contact sheets, and publishes an approval page with one Approve/Later/Reject card per finding (presentation, balance, fun, juice, bugs, build diversity). For roguelites it adds a headless synergy sweep that sorts builds into intended chase builds, accidentally broken, weak and dead. Then it fans out the approved fixes and re-records to compare. |
 
 The last five are the odd ones out: no Godot, no itch, no assets. Four are verification
 discipline — the ways a green check comes to mean nothing — and `cycle` is the loop that runs
@@ -74,6 +75,8 @@ tools/               # repo maintenance; the only scripts here that don't ship t
 - `itch-ci-deploy` is the third itch skill and the only one that does not open a browser: butler can
   push a build and nothing else, so it writes the workflow and hands you the short list of clicks the
   page still needs.
+- `playthrough-video-review` is engine-agnostic: its scripts need only ffmpeg (from `$FFMPEG`, PATH or
+  `pip install imageio-ffmpeg`) and Pillow, and work on any MP4 or frame directory, whatever made it.
 - `itch-store-page` and `itch-devlog` both drive a real logged-in Chrome session via the Claude in
   Chrome extension. They don't use the itch.io API, because it can't touch page presentation.
 - `skill-feedback-issue` closes the loop the other skills open: when one of them gets something
