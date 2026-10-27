@@ -12,7 +12,8 @@ manifest, and no test runner. The deliverable is Markdown plus a handful of stan
 ## Commands
 
 The scripts are the only executable surface. All are stdlib-only except `store_art.py` and `contact_sheet.py` (Pillow); the
-`playthrough-video-review` scripts also need ffmpeg (`$FFMPEG`, PATH, or `pip install imageio-ffmpeg`).
+`playthrough-video-review` scripts also need ffmpeg (`$FFMPEG`, PATH, or `pip install imageio-ffmpeg`), and its
+`record_web.mjs` needs Node >= 22 and Chrome — the repo's only JavaScript, deliberately dependency-free.
 
 ```bash
 python skills/game-from-gibberish/scripts/seed.py --seed 41521    # deterministic; use to verify axes.md edits
@@ -30,6 +31,8 @@ python skills/playthrough-video-review/scripts/contact_sheet.py run.mp4 --every 
 python skills/playthrough-video-review/scripts/extract_moment.py run.mp4 --at 1:23.5 [--window 1]
 python skills/playthrough-video-review/scripts/encode_share.py raw.mp4 --out video.mp4 [--size-mb 15] [--speed 4]
 python skills/playthrough-video-review/scripts/smoke_test.py                    # SMOKE: ALL PASS; synthetic colour-per-second video
+node skills/playthrough-video-review/scripts/record_web.mjs --url page.html --out raw.mp4 [--probe-js ...] [--end-js ...]
+python skills/playthrough-video-review/scripts/smoke_test_record.py             # RECORD: ALL PASS; needs Node 22 + Chrome
 ```
 
 `tools/` is repo maintenance — the only scripts here that do **not** ship to a user:

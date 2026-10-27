@@ -48,24 +48,39 @@ fixed clock. Unity: Recorder package with a fixed frame rate. Then `encode_share
 
 ### 2b. Web / canvas / JS — headless Chrome, virtual clock
 
-`<skill dir>/scripts/record_web.mjs` (stub until ported — its header holds the contract). The technique:
+```bash
+node <skill dir>/scripts/record_web.mjs --url "dist/index.html?seed=3&bot=1" --out raw.mp4 \
+  --events run.jsonl --fps 30 --speed 2 --ready-js 'document.title === "ready"' \
+  --probe-js '({scene: game.scene, key: game.chapter, hp: game.hp, events: window.__ev.splice(0)})' \
+  --end-js 's && (s.scene === "victory" || s.scene === "gameover")' --tail 4
+```
 
-1. Launch Chrome headless with `--remote-debugging-port`; talk CDP over its WebSocket.
-2. `Page.addScriptToEvaluateOnNewDocument` installs a fake clock *before the game's code
-   runs*: `requestAnimationFrame` queues callbacks, `performance.now()`/`Date.now()` return
-   virtual time that moves only when told to. `Emulation.setVirtualTimePolicy` alone does
-   not cover rAF in every Chrome; overriding the three functions does.
-3. Per frame: advance virtual time `1000/fps` ms, run the queued rAF callbacks, then
-   `Page.captureScreenshot` and pipe the PNG to `ffmpeg -f image2pipe -framerate <fps> -i -`.
-   A slow raster only makes the capture slower; the video still plays at exactly `fps`.
-4. **Time-lapse**: step N game frames per captured frame for long runs (a 40 min horde run
-   at 4x is a watchable 10 min), or record 1x and `encode_share.py --speed 4`.
-5. **Event log in video time**: the game (or an injected hook) pushes `{t, kind, ...}` to
-   `window.__events`; the recorder stamps each with the *video* second it landed in and
-   writes JSONL. Damage taken, heals, level-ups, picks, deaths, boss spawns — findings cite
-   these timecodes and the chapter list is built from them.
+Node >= 22, no npm deps; Chrome/Edge from `$CHROME` or the standard install paths.
 
-Seed `Math.random` too (inject a seeded PRNG) or the recorded run is not the swept run.
+- **Virtual clock.** Before any page script runs, it replaces `requestAnimationFrame`,
+  `performance.now()` and `Date.now()`. Each output frame advances the clock `1000/fps*speed` ms,
+  runs the queued rAF callbacks, screenshots and pipes the frame to ffmpeg. A slow raster only
+  makes the capture slower, so the video plays at exactly `fps` and the run is the same for
+  every seed. `smoke_test_record.py` proves this on a page that burns CPU every frame.
+- `--ready-js` gates the start. `--probe-js` returns a small JSON state after every frame:
+  changes to its `--watch` fields (default `scene,key`) and anything in its `events` array go
+  into the JSONL **in video seconds**, together with a `sample` once per second that carries
+  `game_s`. Findings cite those timecodes, and the chapter list is built from them.
+- `--end-js` is evaluated over `s`, the last probe state. Once it is truthy the run keeps
+  `--tail` seconds, then stops. `--seconds` (default 600) is the hard cap.
+- **Time-lapse:** `--speed 3`, or `--speeds 1,3,3` to pick a speed per probe `key` (1x for the
+  intro, 3x for the grind). The alternative is to record at 1x and run `encode_share.py --speed 4`.
+- Seed `Math.random` through a URL flag or an injected PRNG. Without it, the recorded run is not the run you swept.
+
+Recorder gotchas:
+
+- **Above 4x speed at 30 fps the game loses time.** A fixed-step loop that caps steps per
+  frame (the spiral-of-death guard, often 8) drops the excess ms. Raise `--fps` rather
+  than `--speed`, or record at 1x and time-lapse in the encode.
+- **In-game time runs slower than speed × video time** because of hit-stop, page turns and
+  pause overlays. Read `game_s` off the samples, never `t * speed`.
+- **ffmpeg `drawtext` throws Fontconfig errors on Windows** → burn in labels with PIL
+  (as `contact_sheet.py` does), not with an ffmpeg filter.
 
 ### 2c. Share encode
 
@@ -153,5 +168,6 @@ merging to main or shipping.
 | `contact_sheet.py` | video or frame dir → labelled NxM sheets + `index.json` | no frames (missing file, start past end) |
 | `extract_moment.py` | full-size frames around a timecode | timecode past the end, nothing extracted |
 | `encode_share.py` | two-pass share-size MP4, optional time-lapse | unreadable input, >10% over cap |
-| `record_web.mjs` | virtual-clock CDP recorder | **stub** — exits 2 until ported |
+| `record_web.mjs` | virtual-clock CDP recorder + video-time event log | no Chrome/ffmpeg/page, page never ready, ffmpeg error |
+| `smoke_test_record.py` | proves the clock on a synthetic canvas, and that a half-rate clock is caught | prints `RECORD: ALL PASS` |
 | `smoke_test.py` | proves the three above work and can fail | prints `SMOKE: ALL PASS` |

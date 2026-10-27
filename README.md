@@ -77,6 +77,7 @@ tools/               # repo maintenance; the only scripts here that don't ship t
   page still needs.
 - `playthrough-video-review` is engine-agnostic: its scripts need only ffmpeg (from `$FFMPEG`, PATH or
   `pip install imageio-ffmpeg`) and Pillow, and work on any MP4 or frame directory, whatever made it.
+  The web recorder additionally needs Node 22+ and Chrome; it has no npm dependencies.
 - `itch-store-page` and `itch-devlog` both drive a real logged-in Chrome session via the Claude in
   Chrome extension. They don't use the itch.io API, because it can't touch page presentation.
 - `skill-feedback-issue` closes the loop the other skills open: when one of them gets something
