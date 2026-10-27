@@ -1,0 +1,204 @@
+<!--
+  Playthrough review approval page (template).
+  Copy it, replace the JSON in <script id="findings"> with this round's findings, put the
+  share-size MP4 beside it as video.mp4, and publish with
+    capabilities: {db: {}, user: {}, downloads: true}
+    files: {"video.mp4": "<path to encode_share.py output>"}
+  Decisions land in the artifact db, collection `decisions`, one doc per finding id:
+    {verdict: "approve"|"later"|"reject", note, at}
+  Read them back with ArtifactData list `decisions` instead of asking in chat.
+  Outside the claude.ai viewer (local preview) the page falls back to localStorage, which
+  Claude cannot read: that fallback is for previewing the template, not for a real round.
+-->
+<title>Playthrough Review</title>
+<style>
+:root{--bg:#f6f4ef;--card:#fff;--ink:#1d1b18;--dim:#6b665e;--line:#e2ddd3;--accent:#c2410c;
+--ok:#15803d;--later:#a16207;--no:#b91c1c;--chip:#efe9dd;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15130f;--card:#1f1c17;--ink:#eee8dc;
+--dim:#a49d90;--line:#36312a;--accent:#fb923c;--ok:#4ade80;--later:#facc15;--no:#f87171;--chip:#2b2720;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#15130f;--card:#1f1c17;--ink:#eee8dc;--dim:#a49d90;--line:#36312a;--accent:#fb923c;
+--ok:#4ade80;--later:#facc15;--no:#f87171;--chip:#2b2720;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:16px}
+h1{font-size:1.4rem;margin:0 0 4px}.sub{color:var(--dim);margin:0 0 16px}
+.top{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:16px}
+@media (max-width:760px){.top{grid-template-columns:1fr}}
+video{width:100%;border-radius:8px;background:#000;display:block}
+.bar{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
+button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:6px;padding:4px 10px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px}
+.panel h2{font-size:1rem;margin:0 0 8px}
+.chapters{list-style:none;margin:0;padding:0;max-height:360px;overflow:auto}
+.chapters li{display:flex;gap:8px;padding:4px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.tc{font-variant-numeric:tabular-nums;color:var(--accent);white-space:nowrap;background:none;border:0;padding:0}
+.filters{display:flex;gap:6px;flex-wrap:wrap;margin:20px 0 10px}
+.filters button[aria-pressed="true"]{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
+@media (max-width:400px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:6px}
+.card[data-v="approve"]{border-left-color:var(--ok)}.card[data-v="later"]{border-left-color:var(--later)}.card[data-v="reject"]{border-left-color:var(--no)}
+.card h3{font-size:1rem;margin:0}
+.meta{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:.8rem;color:var(--dim)}
+.chip{background:var(--chip);border-radius:99px;padding:1px 8px}
+.card p{margin:0}.lbl{font-weight:600}
+table{border-collapse:collapse;font-size:.85rem;width:100%}td,th{border-bottom:1px solid var(--line);padding:2px 4px;text-align:left}
+.votes{display:flex;gap:6px;margin-top:auto}
+.votes button[aria-pressed="true"][data-v="approve"]{background:var(--ok);color:var(--bg)}
+.votes button[aria-pressed="true"][data-v="later"]{background:var(--later);color:var(--bg)}
+.votes button[aria-pressed="true"][data-v="reject"]{background:var(--no);color:var(--bg)}
+textarea{font:inherit;width:100%;min-height:2.4em;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);padding:4px}
+.status{font-size:.8rem;color:var(--dim)}
+</style>
+
+<script type="application/json" id="findings">
+{
+  "title": "Playthrough review — round 1",
+  "subtitle": "Seed 41, mortal, 100% route. 12:40 of footage at 2x time-lapse.",
+  "video": "video.mp4",
+  "chapters": [
+    {"t": 0, "label": "Title and first wave"},
+    {"t": 95, "label": "First boss"},
+    {"t": 410, "label": "Build online: fire + chain"}
+  ],
+  "findings": [
+    {"id": "f01", "category": "presentation", "t": 12.5, "title": "XP bar hidden under the boss name",
+     "seen": "The boss banner draws over the XP bar for 4 s.", "proposal": "Drop the banner 24 px.",
+     "effort": "S", "impact": "M"},
+    {"id": "f02", "category": "build-diversity", "t": 410, "title": "Fire + Chain is accidentally broken",
+     "seen": "Sweep: 31x median DPS, assembled in 42% of runs; clears wave 20 at level 9.",
+     "proposal": "Keep it a chase build, but gate it behind a rarer fusion.",
+     "change": [{"knob": "chain.fire_bonus", "from": "1.0", "to": "0.4"},
+                {"knob": "fusion.fire_chain.weight", "from": "8", "to": "3"}],
+     "effort": "S", "impact": "L"}
+  ]
+}
+</script>
+
+<main>
+  <h1 id="title"></h1>
+  <p class="sub" id="subtitle"></p>
+  <div class="top">
+    <div>
+      <video id="vid" controls preload="metadata"></video>
+      <div class="bar">
+        <button id="dl" hidden>Download video</button>
+        <span class="status" id="store-status">Loading decisions…</span>
+      </div>
+    </div>
+    <div class="panel"><h2>Chapters</h2><ul class="chapters" id="chapters"></ul></div>
+  </div>
+  <div class="filters" id="filters"></div>
+  <div class="grid" id="cards"></div>
+</main>
+
+<script>
+const DATA = JSON.parse(document.getElementById("findings").textContent);
+const CATS = ["presentation", "balance", "fun", "juice", "bugs", "build-diversity"];
+const decisions = {};           // findingId -> {verdict, note, at}
+let filter = "all";
+
+const fmt = t => { const m = Math.floor(t / 60), s = (t % 60).toFixed(1).padStart(4, "0"); return `${String(m).padStart(2, "0")}:${s}`; };
+const el = (tag, props = {}, kids = []) => { const n = Object.assign(document.createElement(tag), props); n.append(...kids); return n; };
+const vid = document.getElementById("vid");
+function seek(t) { vid.currentTime = t; vid.play().catch(() => {}); vid.scrollIntoView({behavior: "smooth", block: "nearest"}); }
+
+/* ---- storage adapter: the only code that knows where decisions live ------------------
+   db (artifact runtime) when the viewer serves it; localStorage otherwise (preview only). */
+const store = {
+  db: null,
+  async init(onChange) {
+    try { this.db = await (window.claude?.use?.("db") ?? null); } catch { this.db = null; }
+    if (this.db) {
+      this.db.collection("decisions").onSnapshot(
+        snap => { snap.docs.forEach(d => { decisions[d.id] = d.data(); }); onChange("Saved to the artifact — Claude reads these."); },
+        () => onChange("Decisions are read-only in this view."));
+    } else {
+      try { Object.assign(decisions, JSON.parse(localStorage.getItem("review-decisions") || "{}")); } catch {}
+      onChange("Preview mode: decisions stay in this browser only.");
+    }
+  },
+  async save(id, rec) {
+    decisions[id] = rec;
+    if (this.db) {
+      try { await this.db.collection("decisions").doc(id).set(rec); return true; }
+      catch (e) { return false; }
+    }
+    try { localStorage.setItem("review-decisions", JSON.stringify(decisions)); } catch {}
+    return true;
+  },
+};
+
+function renderChapters() {
+  const ul = document.getElementById("chapters");
+  ul.replaceChildren(...DATA.chapters.map(c => el("li", {onclick: () => seek(c.t)},
+    [el("span", {className: "tc", textContent: fmt(c.t)}), el("span", {textContent: c.label})])));
+}
+
+function renderFilters() {
+  const present = CATS.filter(c => DATA.findings.some(f => f.category === c));
+  const box = document.getElementById("filters");
+  box.replaceChildren(...["all", ...present].map(c => el("button", {
+    textContent: c === "all" ? `All (${DATA.findings.length})` : `${c} (${DATA.findings.filter(f => f.category === c).length})`,
+    ariaPressed: String(filter === c), onclick: () => { filter = c; renderFilters(); renderCards(); }})));
+}
+
+function card(f) {
+  const d = decisions[f.id] || {};
+  const note = el("textarea", {placeholder: "Note (optional)", value: d.note || ""});
+  const vote = v => async () => {
+    const ok = await store.save(f.id, {verdict: v, note: note.value.trim(), at: new Date().toISOString()});
+    if (!ok) status("That save was refused — you may not have write access.");
+    renderCards();
+  };
+  note.onchange = () => { if (decisions[f.id]?.verdict) vote(decisions[f.id].verdict)(); };
+  const kids = [
+    el("div", {className: "meta"}, [
+      el("span", {className: "chip", textContent: f.category}),
+      el("button", {className: "tc", textContent: fmt(f.t), title: "Seek video", onclick: () => seek(f.t)}),
+      el("span", {textContent: `effort ${f.effort || "?"} · impact ${f.impact || "?"}`}),
+      ...(f.shipped ? [el("span", {className: "chip", textContent: "shipped"})] : [])]),
+    el("h3", {textContent: f.title}),
+    el("p", {}, [el("span", {className: "lbl", textContent: "Seen: "}), f.seen || ""]),
+    el("p", {}, [el("span", {className: "lbl", textContent: f.shipped ? "Changed: " : "Proposal: "}), f.proposal || ""]),
+  ];
+  if (f.change?.length) kids.push(el("table", {}, [
+    el("tr", {}, ["Knob", "From", "To"].map(h => el("th", {textContent: h}))),
+    ...f.change.map(c => el("tr", {}, [c.knob, c.from, c.to].map(v => el("td", {textContent: v}))))]));
+  if (!f.shipped) kids.push(note, el("div", {className: "votes"}, [["approve", "Approve"], ["later", "Later"], ["reject", "Reject"]]
+    .map(([v, label]) => el("button", {textContent: label, ariaPressed: String(d.verdict === v), onclick: vote(v)}, []))
+    .map((b, i) => (b.dataset.v = ["approve", "later", "reject"][i], b))));
+  const c = el("article", {className: "card"}, kids);
+  if (d.verdict) c.dataset.v = d.verdict;
+  return c;
+}
+
+function renderCards() {
+  const list = DATA.findings.filter(f => filter === "all" || f.category === filter);
+  document.getElementById("cards").replaceChildren(...list.map(card));
+}
+function status(t) { document.getElementById("store-status").textContent = t; }
+
+async function initDownload() {
+  let dl = null;
+  try { dl = await (window.claude?.use?.("downloads") ?? null); } catch {}
+  if (!dl) return;
+  const btn = document.getElementById("dl");
+  btn.hidden = false;
+  btn.onclick = async () => {
+    try {
+      const blob = await (await fetch(DATA.video)).blob();
+      await dl.save({filename: DATA.video.split("/").pop(), data: blob});
+    } catch (e) { status(e?.code === "declined" ? "Download cancelled." : "Download failed."); }
+  };
+}
+
+document.getElementById("title").textContent = DATA.title;
+document.getElementById("subtitle").textContent = DATA.subtitle || "";
+vid.src = DATA.video;
+renderChapters(); renderFilters(); renderCards();
+// Never re-render under a viewer who is mid-note: the snapshot would replace their textarea.
+store.init(msg => { status(msg); if (document.activeElement?.tagName !== "TEXTAREA") renderCards(); });
+initDownload();
+</script>

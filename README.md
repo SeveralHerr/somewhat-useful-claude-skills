@@ -49,6 +49,7 @@ For local development against a checkout instead of GitHub, point the marketplac
 | `mockup-on-screenshot` | Mocks up game feature and art ideas by overlaying the real sprites on a real screenshot at measured landmarks, puts art "behind" the playfield with a clip-path re-layer, and renders every artboard locally before it is published, looking for occluded props, low contrast and clipped text. |
 | `web-haptics` | Adds vibration to a browser game from its event stream — a pure cue table with priorities, a playback layer that sends one `navigator.vibrate` call per frame so a bumper tap never cuts off a jackpot, and a toggle shown only where the device can actually buzz. Covers why it silently does nothing on iOS, on desktop and inside an itch.io iframe until it is tapped, and proves real taps reach the vibrator with a headless phone e2e that is mutated to show it can fail. |
 | `webgl-antialiasing` | Fixes jagged edges in a three.js / WebGL game without breaking low-end phones: first finds which quality profile and context actually drew the jaggies (real `gl.SAMPLES`, DPR upscaling), picks MSAA over FXAA because post-process AA blurs pixel art and text, and keeps a self-heal ladder (full → safe → bare, once per rung per tab) for drivers that lose the context. Includes a headless `WEBGL_lose_context` proof of that heal loop. |
+| `playthrough-video-review` | Records a scripted 100% playthrough of your game as a share-size MP4 — Godot movie mode, or headless Chrome on a virtual clock for web games so the footage is smooth however slowly the page rasters — reads it as timecode-labelled contact sheets, and publishes an approval page with one Approve/Later/Reject card per finding (presentation, balance, fun, juice, bugs, build diversity). For roguelites it adds a headless synergy sweep that sorts builds into intended chase builds, accidentally broken, weak and dead. Then it fans out the approved fixes and re-records to compare. |
 
 The last five are the odd ones out: no Godot, no itch, no assets. Four are verification
 discipline — the ways a green check comes to mean nothing — and `cycle` is the loop that runs
@@ -81,6 +82,9 @@ tools/               # repo maintenance; the only scripts here that don't ship t
 - `itch-ci-deploy` is the third itch skill and the only one that does not open a browser: butler can
   push a build and nothing else, so it writes the workflow and hands you the short list of clicks the
   page still needs.
+- `playthrough-video-review` is engine-agnostic: its scripts need only ffmpeg (from `$FFMPEG`, PATH or
+  `pip install imageio-ffmpeg`) and Pillow, and work on any MP4 or frame directory, whatever made it.
+  The web recorder additionally needs Node 22+ and Chrome; it has no npm dependencies.
 - `itch-store-page` and `itch-devlog` both drive a real logged-in Chrome session via the Claude in
   Chrome extension. They don't use the itch.io API, because it can't touch page presentation.
 - `skill-feedback-issue` closes the loop the other skills open: when one of them gets something

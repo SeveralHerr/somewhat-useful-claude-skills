@@ -4,14 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-A content repository, not an application: twenty-two Claude Code skills for indie game development
-(Godot 4 UI, itch.io publishing and CI deploy, Kenney assets, Blender asset authoring, seeded game design, and a
+A content repository, not an application: twenty-three Claude Code skills for indie game development
+(Godot 4 UI, itch.io publishing and CI deploy, Kenney assets, Blender asset authoring, seeded game design,
+playthrough video review, and a
 self-improvement loop), packaged as one installable plugin. There is nothing to build, no dependency
 manifest, and no test runner. The deliverable is Markdown plus a handful of standalone scripts.
 
 ## Commands
 
-The scripts are the only executable surface. All are stdlib-only except `store_art.py` (Pillow).
+The scripts are the only executable surface. All are stdlib-only except `store_art.py` and `contact_sheet.py` (Pillow); the
+`playthrough-video-review` scripts also need ffmpeg (`$FFMPEG`, PATH, or `pip install imageio-ffmpeg`), and its
+`record_web.mjs` needs Node >= 22 and Chrome, with no npm dependencies.
 
 ```bash
 python skills/game-from-gibberish/scripts/seed.py --seed 41521    # deterministic; use to verify axes.md edits
@@ -25,6 +28,12 @@ python skills/godot-game-ui-juicy/scripts/scaffold_juicy_ui.py <godot project>
 python skills/itch-store-page/scripts/store_art.py palette|cover|banner --src shot.png
 python skills/itch-ci-deploy/scripts/scaffold_itch_deploy.py <godot project> --target user/game:html5 [--check]
 python skills/itch-ci-deploy/scripts/smoke_test_scaffold.py                     # SMOKE: ALL PASS; proves the checks can fail
+python skills/playthrough-video-review/scripts/contact_sheet.py run.mp4 --every 2 --grid 4x4 --out sheets/
+python skills/playthrough-video-review/scripts/extract_moment.py run.mp4 --at 1:23.5 [--window 1]
+python skills/playthrough-video-review/scripts/encode_share.py raw.mp4 --out video.mp4 [--size-mb 15] [--speed 4]
+python skills/playthrough-video-review/scripts/smoke_test.py                    # SMOKE: ALL PASS; synthetic colour-per-second video
+node skills/playthrough-video-review/scripts/record_web.mjs --url page.html --out raw.mp4 [--probe-js ...] [--end-js ...]
+python skills/playthrough-video-review/scripts/smoke_test_record.py             # RECORD: ALL PASS; needs Node 22 + Chrome
 ```
 
 `module-gauntlet/scripts/gauntlet.workflow.js` runs only under Claude Code's Workflow tool, not
