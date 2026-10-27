@@ -33,7 +33,11 @@ Two separate editors, and people conflate them:
 - **The game page itself, `<user>.itch.io/<slug>`** → the **Edit theme** bar → colours,
   fonts, screenshot placement, banner / background / embed-bg images.
 
-Find `<id>` from `itch.io/dashboard`: each project's Edit link is `/game/edit/<id>`.
+Find `<id>` from `itch.io/dashboard`: each project's Edit link is `/game/edit/<id>`. Read
+the public URL from the same place — the dashboard's or edit form's **View page** link —
+rather than building it. `<user>` is the account's username, not the studio or brand the
+game is published as: a guessed `<studio>.itch.io/<slug>` came back "We couldn't find your
+page", which reads as an unpublished or deleted game when it is only the wrong subdomain.
 
 ## Workflow
 
@@ -99,10 +103,12 @@ window.__target.dispatchEvent(new Event('change', { bubbles: true }));
 ```
 
 Wait ~5s, then confirm the hidden id field is populated. **Restore
-`HTMLInputElement.prototype.click` and remove the shim before saving**, or a later real
-click silently does nothing.
+`HTMLInputElement.prototype.click` and remove the shim when the upload is done** (before
+any Save), or a later real click silently does nothing.
 
-Screenshots accept all files in one go; cover and banner are single.
+Screenshots accept all files in one go; cover and banner are single. Screenshot uploads
+and deletes persist server-side the moment they finish — no Save press, confirmed by
+reload — so a half-run script leaves a half-changed gallery, not a discarded draft.
 
 ### Replacing an image that is already set
 
@@ -118,9 +124,45 @@ The two single-image widgets behave in opposite ways, so the rule is per widget:
 - **Theme editor, banner** — inverted. With an image set, the only control offered is
   **Remove image**; `Upload` does not reappear until after it. That path is safe — no
   dialog, no hang — so removing first is required rather than forbidden.
+- **Edit form, screenshots** — there is no replace; each row's `.delete_screen_btn` is the
+  only way out, and it calls the same native `confirm("Are you sure you want to delete
+  this screenshot?")`. Here you cannot avoid the dialog, so pre-answer it (below).
 
 Read the widget before acting rather than carrying one habit to the other: "which button
 is present" is the question, and the answer differs between the two editors.
+
+### Replacing screenshots
+
+Only with the user's go-ahead to delete (see Boundaries). Then:
+
+1. **Upload the replacements first**, then poll until `input[name^="screenshot["]` holds
+   old + new ids (5 × ~900 KB took ~25s). Deleting first means a failed upload leaves the
+   live page with no screenshots at all — and since nothing waits for Save, that is
+   immediately public.
+2. **Delete the old rows with `confirm` stubbed**, recording what it was asked, then
+   restore it:
+
+```js
+// oldIds: the screenshot ids read BEFORE step 1. Row = nearest ancestor holding a delete btn.
+const rowFor = (id) => document.querySelector(`input[name="screenshot[${id}][position]"]`)
+  .closest(':has(.delete_screen_btn)');
+const log = [], origConfirm = window.confirm;
+window.confirm = (m) => { log.push(m); return true; };
+try {
+  for (const id of oldIds) {   // one at a time: each delete is a request plus a re-render
+    rowFor(id).querySelector('.delete_screen_btn').click();
+    await new Promise(r => setTimeout(r, 2500));
+  }
+} finally { window.confirm = origConfirm; }
+log.length === oldIds.length   // proof each delete really asked, and was answered
+```
+
+   The log is the evidence: an empty one means you clicked something that was not the
+   delete control, not that the delete was dialog-free.
+3. **Reload and check the order.** The gallery sorts by upload id, which is the order the
+   uploads *completed*, not the order the files were selected — one large file finishing
+   last moves to the end. If order matters, fix it afterwards with the Move up/down
+   controls (or the `screenshot[<id>][position]` fields plus Save).
 
 ## Field reference
 
@@ -204,6 +246,8 @@ Theme editor:
 | Headers / buttons | `layout[header_text_color]`, `layout[button_color]` |
 | Screenshot placement | `layout[screenshots_loc]` — `""` \| `sidebar` \| `hidden` |
 | Banner image id | `layout[banner_image][image_id]` |
+| Embed background id | `layout[embed_background_image][image_id]` — the image behind **Run game** |
+| Body / header font | `layout[font_family]`, `layout[header_font_family]` — Google fonts via a search modal (below) |
 
 Set text inputs through the native setter, then fire `input` + `change`, or the live
 preview and the save both ignore you:
@@ -213,6 +257,13 @@ Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el
 el.dispatchEvent(new Event('input',  { bubbles: true }));
 el.dispatchEvent(new Event('change', { bubbles: true }));
 ```
+
+Fonts are not in the select's option list. Set the select to `_select_google_font` and fire
+`change`; a "Select a font" modal opens with an input whose placeholder is `Search for font by
+name...`. Type the family with real keystrokes (it autocompletes from Google Fonts), click the
+first hit, then read the select back — its value becomes the family name (`Gaegu`, `Rubik`).
+Use the fonts the game itself loads: the header font only styles headings inside the
+description, not itch's own chrome, so it costs nothing to match the game's display face there.
 
 ## Art and colours
 
@@ -260,6 +311,52 @@ already there. Integer scaling is not optional in either mode: the crop is alway
 exact whole multiple of the target, box-filtered down by that whole number, so there is
 no non-integer path to fall into.
 
+### When the game can render its own key art
+
+A crop of a gameplay screenshot is the weakest cover there is: at 630×500 the hero is a
+thumbnail-sized smudge, and upscaling a crop makes it soft. If the game draws from vector
+masters (SVG generators, a Godot scene of vector shapes) or has a scene harness that can build
+a state by hand, **stage the shot in the engine instead** — the real renderer, the real
+sprites, posed. Measured on a canvas survivors-like (2026-10-22), twelve screenshot-and-critique
+rounds turned up the same handful of fixes every time:
+
+- **Zoom with vectors, not pixels.** Load sprites from their vector masters into the
+  renderer and scale the canvas transform (2× for a 630×500 cover rendered at 1260×1000). A
+  bitmap cache in the path — boil/jitter variants, tint caches — is baked at 1× and blurs;
+  turn that effect off for the shot.
+- **Play the real simulation, then pin it.** Run the sim for a few frames so shots, hits,
+  damage numbers and splats are genuine, but reset enemy positions every step (or the horde
+  buries the hero within a second) and refill their HP (or the frame empties). Stagger weapon
+  cooldowns so projectiles are in flight *and* landing in the same frame; the juice peaks a
+  handful of frames after the first volley, not at frame 0 and not at frame 70.
+- **Clear transient states that only read in motion.** A one-frame hit flash reads as a hole
+  in a still; a telegraph tint recolours the enemies and erases the contrast the art is built
+  on. Skip the first frames too: spawn pop-in draws everything tiny.
+- **Lay out for the title, not around it.** Keep a clean band where the lettering goes and
+  place enemies explicitly (`[enemy, dx, dy]` from the hero) — twice, a foe ended up hidden
+  behind a word. Set the title in the game's own font and colours, with its outline style.
+- **Judge at display size.** Downscale the cover to 315×250 (the browse grid) and the banner
+  to the column width before calling it done; the full-size PNG flatters everything.
+
+### The page is one picture
+
+The banner sits directly on top of the embed, and with a matching content colour the two read
+as a single scene. Plan them together:
+
+- **Embed background is drawn unscaled** (`background-size: auto`, centred, repeating) inside
+  the embed frame. Render it at exactly the embed size (960×540 for a 960×540 embed); a larger
+  image is cropped to its middle, not shrunk.
+- **Show the hero once.** With the hero in the banner, the embed background is better as the
+  enemies ringing an empty centre — the **Run game** button sits where the hero would be.
+- **Banner** renders at the column width (960 wide). 1280×320 uploaded fine; 1920×480 failed
+  twice with "Upload failed — Timed out checking file, are you sure it was an image file?" and
+  froze the tab's renderer while it tried.
+- **Content background from the art's own ground.** If the art is drawn on paper, set
+  `bg2_color` to that paper and `bg_color` to whatever lies beyond it in-game; the banner then
+  bleeds into the page instead of sitting on it as a sticker. Re-check contrast against the
+  *new* panel: a saturated brand orange that passed on dark (5.6:1) fell to 2.45:1 on paper —
+  use its darker shade for links and buttons.
+
 ### When there is nothing to photograph
 
 No title screen, or a screen that photographs badly — then composite:
@@ -278,7 +375,9 @@ save is usually sparse and photographs as an empty field. If the project has a d
 bridge, use it to grant resources, unlock areas and move the player somewhere dense
 before grabbing frames, and hide the HUD for the cover (a store cover wants game pixels,
 not UI) while leaving it visible for the gallery shots, which should show the real
-interface.
+interface. If the project already has a headless screenshot tool that renders the real
+build, prefer it to hand captures: it is repeatable, and it doubles as a smoke gate — a run
+that logs errors should not supply frames, so the store never advertises a broken build.
 
 Build the theme from `palette` output rather than taste: colours lifted from the game's
 own art make the page read as an extension of it, and they will not clash with the
@@ -304,6 +403,9 @@ background — palette mid-tones are usually too dim and need lightening.
   or timed out at 30s often enough to mislead — a blank frame looks like an empty form and
   invites you to re-do work that already landed. Verify with JS reads of the actual field
   values (and a reload) and keep screenshots for the rendered public page.
+- **The public gallery is lazy-loaded.** `.screenshot_list img` report 0×0 and
+  `naturalWidth` 0 until scrolled into view, so measuring straight after load says a
+  working gallery is broken. Scroll `.screenshot_list` into view, wait, then measure.
 
 ## Boundaries
 
@@ -314,7 +416,9 @@ Some fields on this form are declarations by the user, not styling:
 - **AI generation disclosure** — a required statement about how the game was made, with
   policy weight. If it is already answered, do not touch it. If it is blank, ask; do not
   answer on the user's behalf.
-- **Pricing** and **deleting existing uploads or images** — confirm first.
+- **Pricing** and **deleting existing uploads or images** — confirm first. An explicit
+  request ("replace the screenshots", "remove the old ones") is that confirmation; stubbing
+  `confirm()` answers itch's dialog, never the user's.
 
 Everything else (copy, tags, theme, adding art) is ordinary work; just report what you
 changed and verify it after a reload.

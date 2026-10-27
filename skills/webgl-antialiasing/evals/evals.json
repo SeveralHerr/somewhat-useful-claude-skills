@@ -1,0 +1,44 @@
+{
+  "skill_name": "webgl-antialiasing",
+  "evals": [
+    {
+      "id": 0,
+      "name": "jaggies-on-android",
+      "prompt": "My three.js game looks smooth on my laptop but a player sent an Android screenshot where every edge is jagged and the outlines look dashed. I already pass antialias: true to WebGLRenderer. Can you fix it?",
+      "expected_output": "Diagnoses which profile/context drew the screenshot before changing anything, finds the cause (MSAA off or ignored, or a DPR-1 canvas upscaled by the phone), and fixes it with MSAA rather than a post-process AA pass, proven by a reported aa value and a device screenshot.",
+      "assertions": [
+        "Before proposing a fix, it determines which quality profile / context the phone actually used, rather than assuming the desktop path.",
+        "It checks real anti-aliasing via gl.getParameter(gl.SAMPLES) (or a health hook reporting it), not only the antialias flag passed to the constructor or getContextAttributes().",
+        "It compares the renderer's pixel ratio against devicePixelRatio and explains that a DPR-1 canvas upscaled by the phone produces stair-steps and dashed thin outlines.",
+        "It does not add FXAA or SMAA as the fix; it uses MSAA (or a multisampled render target if SAMPLES is 0) and says why post-process AA would blur sprites and text.",
+        "Verification includes an exposed aa / health value and a screenshot from the real device, not only a headless crop."
+      ]
+    },
+    {
+      "id": 1,
+      "name": "fxaa-blurs-pixel-art",
+      "prompt": "I added an FXAA pass with EffectComposer to my WebGL pixel-art game to get rid of jaggies. Now the sprites and the score text look smeared. If I remove FXAA the edges are jagged again even though antialias is true. What should I do?",
+      "expected_output": "Explains that FXAA blurs pixel art and text because it works on the final image, and that EffectComposer renders into its own target so canvas antialias no longer applies; replaces FXAA with a multisampled composer render target (or direct rendering with MSAA) and checks sprite texture filtering.",
+      "assertions": [
+        "It explains that post-process AA cannot tell a sprite's hard pixel edges from geometry edges, so it blurs pixel art and small text.",
+        "It identifies that EffectComposer renders the scene into its own render target, which is why antialias: true on the renderer stops affecting the scene.",
+        "The fix uses MSAA: a render target with samples (e.g. 4) passed to the composer, or rendering without the composer, rather than tuning FXAA parameters.",
+        "It mentions checking texture filtering (NearestFilter / no mipmaps for sprites) as a separate cause of blurry pixel art.",
+        "It proposes an A/B comparison crop (no AA vs candidate vs MSAA) of one edge and one text region."
+      ]
+    },
+    {
+      "id": 2,
+      "name": "context-lost-safe-mode",
+      "prompt": "Some phones show a white canvas a few seconds after my three.js game loads, but the HTML score overlay keeps updating. I want a low-quality mode for weak GPUs, but I don't want those players stuck with jagged graphics.",
+      "expected_output": "A profile ladder (full / safe-with-MSAA / bare) chosen at boot, an early-failure self-heal that steps down one rung and reloads at most once per rung per tab via sessionStorage, an on-screen graphics banner naming the profile and GPU, and a headless proof of the heal loop with WEBGL_lose_context.",
+      "assertions": [
+        "It defines at least three profiles where the low-power 'safe' profile keeps MSAA and a further 'bare' profile drops it, instead of turning MSAA off in safe mode permanently.",
+        "The self-heal steps down one profile and reloads only on an early failure, and records the profiles already healed from in sessionStorage so reloads are bounded and cannot loop.",
+        "It handles webglcontextlost with preventDefault() and reports a lost context or blank frame on screen with the profile and GPU name, instead of leaving a silent white canvas.",
+        "Storage reads and writes are wrapped in try/catch.",
+        "It proves the heal path headlessly by calling WEBGL_lose_context.loseContext() and asserting the full -> safe -> bare -> banner sequence with a bounded number of reloads."
+      ]
+    }
+  ]
+}

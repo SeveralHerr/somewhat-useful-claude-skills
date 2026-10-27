@@ -1,0 +1,51 @@
+{
+  "skill_name": "web-haptics",
+  "evals": [
+    {
+      "id": 0,
+      "name": "add-vibration-to-event-driven-game",
+      "prompt": "My browser breakout game (plain JS, canvas, an event bus that emits things like brick.hit, paddle.hit, powerup, life.lost, game.over) gets played a lot on phones. Add vibration so hits and big moments feel like something, with a way to turn it off.",
+      "expected_output": "A pure cue table keyed by the game's real event types with a pattern and priority per cue, a playback layer with an injected vibrate function that plays one cue per frame and never lets an equal or lower priority cut a running cue, a haptics setting defaulting to on, a toggle shown only on touch devices with navigator.vibrate, and tests including a headless phone e2e.",
+      "assertions": [
+        "Support is gated on BOTH a coarse pointer (matchMedia('(pointer: coarse)')) AND typeof navigator.vibrate === 'function', not on the function alone (desktop Chrome defines it).",
+        "At most one navigator.vibrate call is made per frame, choosing the highest-priority cue among that frame's events.",
+        "A running cue is replaced only by a strictly higher priority; equal or lower cues are held off for at least the pattern's length (with a minimum gap of tens of ms).",
+        "Tap cues are short single pulses of roughly 10-25 ms; multi-pulse patterns are reserved for rule-level moments such as life lost or game over.",
+        "A refused call (vibrate returns false or throws) is counted, not retried, and cannot throw into the game loop.",
+        "A running pattern is cancelled with vibrate(0) when the document becomes hidden.",
+        "The vibration toggle is hidden where the device cannot vibrate, and previously saved settings without the new key load with vibration on.",
+        "The cue table's event types are checked against the event names the source actually emits (derived by scanning the source), not a hand-typed list."
+      ],
+      "files": []
+    },
+    {
+      "id": 1,
+      "name": "vibrate-dead-on-itch",
+      "prompt": "Vibration works when I test my web game on my Android phone from my laptop's dev server, but on the itch.io page it never buzzes. The console shows something about an Intervention blocking navigator.vibrate. Also a friend says it does nothing on his iPhone. What's wrong?",
+      "expected_output": "Explains sticky activation: Chrome refuses vibrate until the frame has been tapped, and in itch.io's cross-origin iframe the tap must land inside the game iframe (the host page's Run button does not count); vibrate returns false meanwhile. Explains that iOS Safari has no navigator.vibrate, so the iPhone result is expected and the game should hide its vibration toggle there. Proposes a fix (require an in-game tap to start, count blocked calls without retrying) and a headless phone e2e that touches controls via the touchscreen and asserts played > 0 and blocked === 0.",
+      "assertions": [
+        "Identifies sticky user activation as the cause: vibrate is ignored (returns false) until the frame itself has received a tap.",
+        "States that inside a cross-origin iframe such as itch.io's, the activating tap must land inside the iframe, not on the host page.",
+        "States that the call does not need to be inside the gesture handler; any later call (e.g. from requestAnimationFrame) works once a tap has landed.",
+        "States that iOS Safari does not implement navigator.vibrate, so no vibration on the iPhone is expected rather than a bug to fix.",
+        "Does not propose retrying vibrate in a loop until it succeeds.",
+        "Proposes a test that drives real touch input (page.touchscreen or equivalent) in an emulated phone and checks a played/blocked counter, rather than calling vibrate directly from page.evaluate."
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "jackpot-never-buzzes",
+      "prompt": "I added navigator.vibrate calls to my pinball game: every collision event calls vibrate with its own pattern. Bumper storms feel like one long rattle and the jackpot pattern basically never plays. Fix it.",
+      "expected_output": "Explains that each vibrate() call cancels the running pattern, so calling per event lets the last event of the frame win and a stream of taps becomes one continuous buzz. Replaces per-event calls with a cue table plus a playback layer: one call per frame for the top-priority cue, a busy window during which only strictly higher priority interrupts, and a minimum gap that caps tap rate. Adds unit tests for priority, tie, busy window expiry and storm cap.",
+      "assertions": [
+        "Explains that every navigator.vibrate call cancels whatever pattern is currently running.",
+        "Replaces per-event calls with a single call per frame choosing the highest-priority cue.",
+        "Jackpot (or the equivalent rule-level cue) has a higher priority than collision taps, and taps cannot interrupt it while it runs.",
+        "A minimum gap between equal-priority cues caps the tap rate during a storm (on the order of 50 ms, about 20 taps/s).",
+        "Unit tests cover: higher priority interrupts, equal priority does not, the busy window expires, and a burst of taps produces fewer calls than events."
+      ],
+      "files": []
+    }
+  ]
+}

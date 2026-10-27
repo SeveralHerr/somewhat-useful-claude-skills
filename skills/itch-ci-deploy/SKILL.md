@@ -1,6 +1,6 @@
 ---
 name: itch-ci-deploy
-description: Set up continuous deployment of a Godot 4 game to itch.io — a GitHub Actions workflow that exports the Web build headlessly on every push to main and pushes it with butler — and diagnose the ways that pipeline fails. Ships a scaffolder that measures the project (Godot version, export preset, thread support, gitignore, renderer) before writing the workflow, because each of those is a way the first run fails after eight minutes of downloading templates. Use this whenever the user wants their game to deploy, publish, upload or ship to itch.io automatically, mentions butler, wharf, a "deploy workflow", "CI for the web build", "push to itch on commit", or wants to copy another repo's itch deploy — and at the symptoms: the Actions run is green but the itch page shows nothing or an old build, the exported game is a black canvas with a SharedArrayBuffer error, "export produced no index.html", "no export preset named Web", "butler: no credentials", "no credentials and stdin is not a terminal", "invalid game", "itch.io API error (400) /wharf/builds", "the secret is set but butler says it isn't", "the templates are downloaded every run", "the run was cancelled", and when a run went green but the deployed build behaves differently from the editor. For the itch page itself (cover, tags, embed size, theme) use itch-store-page; for a devlog use itch-devlog — this skill only gets the build there.
+description: Set up continuous deployment of a Godot 4 game to itch.io — a GitHub Actions workflow that exports the Web build headlessly on every push to main and pushes it with butler — and diagnose the ways that pipeline fails. Ships a scaffolder that measures the project (Godot version, export preset, thread support, gitignore, renderer) before writing the workflow, because each of those is a way the first run fails after eight minutes of downloading templates. Use this whenever the user wants their game to deploy, publish, upload or ship to itch.io automatically, mentions butler, wharf, a "deploy workflow", "CI for the web build", "push to itch on commit", or wants to copy another repo's itch deploy — and at the symptoms: the Actions run is green but the itch page shows nothing or an old build, the exported game is a black canvas with a SharedArrayBuffer error, "export produced no index.html", "no export preset named Web", "butler: no credentials", "no credentials and stdin is not a terminal", "invalid game", "itch.io API error (400) /wharf/builds", "the secret is set but butler says it isn't", "the templates are downloaded every run", "the run was cancelled", when a run went green but the deployed build behaves differently from the editor, and when a live smoke or health check of the itch build stays green while players still see an old version. For the itch page itself (cover, tags, embed size, theme) use itch-store-page; for a devlog use itch-devlog — this skill only gets the build there.
 ---
 
 # itch.io continuous deploy for Godot 4
@@ -98,6 +98,19 @@ The scaffolder writes the workflow; `itch-store-page` covers every click on the 
    SHA — so "is the live build the commit I think it is" is a lookup, not a guess. Or open
    the page and read the version next to the upload.
 
+   That proves the *channel* is current, not the URL anything loads. itch serves the HTML5
+   build from `https://html-classic.itch.zone/html/<uploadId>-<buildId>/index.html`, and
+   the build id changes on **every** push. A smoke test or uptime check that hard-codes that
+   URL keeps booting the previous build and reporting green forever — in the reported case
+   the prod check passed after a deploy it had never looked at. A draft page 404s and a password-protected one serves
+   itch's password form to anything without the owner's cookie, which is exactly what
+   tempts people to hard-code the embed in the first place. So a live check must prove
+   **freshness, not just health**: resolve the embed from the page when it is public, then
+   fetch `<embed dir>/version.txt` (the workflow writes it before the push) and compare it
+   to `git rev-parse origin/main` after a `git fetch`. A mismatch is a failure named "stale
+   build", not a pass. If the page is not public, fail with the instruction to copy the new
+   embed URL from the logged-in page rather than silently falling back to an old one.
+
 7. **Then actually play the embed once, in a real browser.** A green run plus a page that
    renders proves the *right bytes* arrived; it proves nothing about what those bytes do.
    An exported template build is not the editor: `OS.has_feature("editor")` and
@@ -153,6 +166,9 @@ Read `<skill dir>/assets/deploy-to-itchio.yml`; the comments carry the reasons. 
 - **`BUTLER_API_KEY is unset or empty` in the first ten seconds.** That is the guard doing
   its job, not a new problem — the same empty-secret mistake, caught before the run costs
   anything. The fix is the same `--body` re-set.
+- **Health check green, but players see the old game.** The check is pinned to an old
+  `itch.zone/html/<uploadId>-<buildId>/` URL; see step 6. Compare `version.txt` at the URL
+  it loads with the commit you pushed.
 - **Green run, page renders, but the game behaves wrong.** The export is not the editor;
   see step 7. Suspect `OS.has_feature`/`is_debug_build` branches and autoload entry hooks
   before you suspect the pipeline, and never treat a green Actions run as a test of the

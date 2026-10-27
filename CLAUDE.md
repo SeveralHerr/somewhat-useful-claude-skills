@@ -4,16 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-A content repository, not an application: seventeen Claude Code skills for indie game development
+A content repository, not an application: twenty-three Claude Code skills for indie game development
 (Godot 4 UI, itch.io publishing and CI deploy, Kenney assets, Blender asset authoring, seeded game design,
-playthrough video review, and a self-improvement loop), packaged as one installable plugin. There is nothing to build, no dependency
+playthrough video review, and a
+self-improvement loop), packaged as one installable plugin. There is nothing to build, no dependency
 manifest, and no test runner. The deliverable is Markdown plus a handful of standalone scripts.
 
 ## Commands
 
 The scripts are the only executable surface. All are stdlib-only except `store_art.py` and `contact_sheet.py` (Pillow); the
 `playthrough-video-review` scripts also need ffmpeg (`$FFMPEG`, PATH, or `pip install imageio-ffmpeg`), and its
-`record_web.mjs` needs Node >= 22 and Chrome — the repo's only JavaScript, deliberately dependency-free.
+`record_web.mjs` needs Node >= 22 and Chrome, with no npm dependencies.
 
 ```bash
 python skills/game-from-gibberish/scripts/seed.py --seed 41521    # deterministic; use to verify axes.md edits
@@ -34,6 +35,11 @@ python skills/playthrough-video-review/scripts/smoke_test.py                    
 node skills/playthrough-video-review/scripts/record_web.mjs --url page.html --out raw.mp4 [--probe-js ...] [--end-js ...]
 python skills/playthrough-video-review/scripts/smoke_test_record.py             # RECORD: ALL PASS; needs Node 22 + Chrome
 ```
+
+`module-gauntlet/scripts/gauntlet.workflow.js` runs only under Claude Code's Workflow tool, not
+from a shell. To check an edit, dry-run it in Node with `agent`/`phase`/`log`/`args` stubbed
+(strip `export` from `meta` and wrap the body in an `AsyncFunction`) and assert the call
+sequence for a single module, a batch with validation and final gate, and the revise cap.
 
 `tools/` is repo maintenance — the only scripts here that do **not** ship to a user:
 
@@ -116,7 +122,7 @@ prove it can exit non-zero before you trust it.
 
 `skills/godot-game-ui/evals/evals.json` is a `skill-creator` eval set (`skill_name` + `evals[]`
 of `prompt` / `expected_output` / `assertions`); run it through the `skill-creator` skill. It is
-the only skill with evals — new eval sets should follow that file's shape.
+the template the other eval sets follow — new eval sets should use that file's shape.
 
 ## Architecture
 

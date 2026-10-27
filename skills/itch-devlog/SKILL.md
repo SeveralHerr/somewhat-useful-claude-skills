@@ -15,7 +15,8 @@ noise, and the reader learns the log is not worth opening tomorrow.
 So the target is deliberately, uncomfortably small:
 
 - **Title** — names the single most interesting thing. Not "Devlog #7", not the date.
-- **One lead sentence**, optional. Skip it if the bullets speak for themselves.
+- **One lead sentence**, optional. Skip it if the bullets speak for themselves. It is the
+  developer talking to players — never "you asked for…" (see **Voice** below).
 - **3–6 bullets**, each under ~10 words, each something a *player* would notice.
 - **One screenshot.**
 
@@ -25,13 +26,17 @@ does not go here.
 
 ## Workflow
 
+0. Check that JavaScript runs on itch.io — one trivial `javascript_tool` call on the
+   dashboard. Every step below depends on it; if the extension refuses, stop and ask the
+   user to allow the site *before* typing anything into a form you cannot finish.
 1. Pick the project and get its id (below).
-2. Read the day's work from git and translate it (below).
+2. Read the day's work from git, **check it is actually playable**, and translate it (below).
 3. Capture a screenshot that shows one of the things you just listed.
-4. Fill the form, upload/attach the image, **save as a draft**.
-5. Show the user the draft URL and the text. On their go-ahead, tick Published and save.
+4. Fill the form, upload the image, **strip every file/build attachment**, **save as a draft**.
+5. Reload the saved post and confirm the image actually *loads* (below).
+6. Show the user the draft URL and the text. On their go-ahead, tick Published and save.
 
-Step 5 is not optional politeness. A devlog is public, it notifies followers, and the
+Step 6 is not optional politeness. A devlog is public, it notifies followers, and the
 `post[published]` checkbox is **unchecked by default** — itch already treats a first
 save as a draft, so drafting costs nothing and publishing early cannot be undone
 quietly.
@@ -62,6 +67,40 @@ git log --since="6am" --pretty=format:"%s" --no-merges
 Widen to `--since="yesterday"` if that comes back thin — people commit at odd hours,
 and an empty log more often means an early morning than a day with no work.
 
+### Committed is not deployed, and `git log` cannot tell the difference
+
+**Check what the live build actually contains before you write a word about it.** The
+command above lists commits. A devlog describes a *game people can open*. Those are the
+same thing only when today's work has reached itch, and on a project that deploys from
+CI on pushes to one branch, it routinely has not: measured on A-MAZE, 2026-09-22, the
+day's work sat on a feature branch and the playable build was **50 commits behind**.
+Every bullet the git log suggested was true of the repository and false of the game.
+Nothing in the log hints at this — a commit looks identical whether it shipped or not.
+
+Two reads settle it, and the second is the one that counts:
+
+```bash
+git rev-list --count <deploy-branch>..HEAD     # 0 means today's work is on the branch that ships
+gh run list --branch <deploy-branch> --limit 1 # and that its deploy actually succeeded
+```
+
+Then confirm on itch, because the repository's opinion of what shipped is not evidence
+that itch received it. The devlog form's own **Files** tab lists each uploaded build with
+its commit and age — ground truth, one read, on the page you are already on:
+
+```js
+[...document.querySelectorAll('.upload_row, tr, li')]
+  .map(r => r.textContent.replace(/\s+/g, ' ').trim())
+  .filter(t => /\.zip|\.love|\.apk/.test(t)).slice(0, 4)
+// "a-maze-html5.zip 9ba77d2 a minute ago"   <- today's
+// "a-maze-html5.zip 7c400ab 5 days ago"     <- what players had until today
+```
+
+If today's work is not live, **say so and stop** — deploying is the user's call, not a
+step you take to make your own post true. Ask whether to ship it or to write the post as
+upcoming work. Publishing a devlog about features nobody can reach is the one mistake
+here that followers actually notice, because they go and look.
+
 Then **translate, don't transcribe.** Commit subjects are written for the person who
 will `git bisect` next month; they name files, systems and internal decisions. A player
 knows none of those words. Ask of each commit: *what can someone now do, see, or stop
@@ -82,6 +121,30 @@ Never invent a feature to pad the list, and never soften a fix into a feature. I
 day was genuinely one bug fix, the devlog is one bullet — that is an honest post and
 readers trust it more than a padded one.
 
+## Voice: the developer talking to their players
+
+The post is written *by the developer, for the game's audience* — not by you, for the
+person in this chat. The session that produced today's work is full of requests: "add
+more shortcuts", "the torch is too dark", a screenshot with circles on it. None of that
+is the reader's context. Carry it into the post and the devlog reads like a support
+ticket being closed, addressed to someone the reader has never met.
+
+So nothing in the title, lead or bullets refers to the conversation or to who asked:
+
+| Leaks the session | Speaks to the audience |
+|---|---|
+| You asked for more ways through the maze. Here they are. | The mazes now have far more ways through. |
+| As requested, the torch is brighter | Brighter torchlight in the corridors |
+| Per playtest feedback, flasks are easier to grab | Oil flasks are easier to pick up |
+| Fixed the bug you reported with the map | The map no longer opens on the wrong floor |
+
+The tells to scan for before saving: **you asked / you wanted / as requested / per your
+feedback / playtesting said / by request / you'll be glad to hear**. "You" is fine only
+when it means the player in the game ("you can now sprint") — never the person
+directing the work. Credit a real public request only when there is one to point at (a
+comment on the page, a jam rating), and name it as such; a private instruction in this
+session is not community feedback.
+
 ## The screenshot
 
 Shoot it for the bullets you just wrote. A generic title-screen grab attached to a post
@@ -100,40 +163,105 @@ the frame is dense rather than an empty starting field, and prefer a shot where 
 thing is actually visible on screen. If there is no way to drive the game, ask the user
 for a PNG rather than attaching something stale.
 
-Three separate places an image can live on a devlog — pick deliberately:
+**A browser game: shoot it headless, not in the extension's tab.** The Claude in Chrome
+tab is a background tab — `document.hidden` is true, `requestAnimationFrame` stops, and a
+game loop that suspends on visibility renders a black frame. Drive the local dev server
+with `puppeteer-core` (headless Chrome is always "visible") and `page.screenshot()` to a
+file. Wait out any banner or toast before capturing ("Map Found", "Level 3") — they sit
+dead centre for a few seconds and ruin the frame.
 
-- **Attachment** (`attachment[N][object_type]=image`) — shows in the post body area.
-  This is the normal home for the day's screenshot.
-- **Cover** (`post[cover_image_id]`) — the thumbnail in feeds and the devlog list.
-  Worth setting too; it is what most people actually see.
-- Existing project screenshots can be attached with no upload at all, from the
-  **Images** tab — one `.click()` on an `Attach` button. Good for a filler shot, wrong
-  for "here is what changed today".
+**Save the PNG where the extension may read it** — inside the project or a folder the user
+has shared with the session. The upload below reads it from disk; nothing else will.
 
-### Uploading a new image
+Two places the day's screenshot goes — set both, from the same file:
 
-The **Upload image** tab's picker has **no `<input type=file>` in the DOM** — the widget
-creates one on demand and calls `.click()` on it, which opens a native OS dialog you
-cannot drive. Swallow that call to capture the real input, then feed it files through a
-shim input of your own:
+- **Attachment** (`attachment[N][object_type]=image`) — shows in the post body. Uploaded
+  from the attachment picker's **Upload image** tab, whose button reads **Select images**.
+- **Cover** (`post[cover_image_id]`) — the thumbnail in feeds and the devlog list; it is
+  what most people actually see. Uploaded from the widget under the **Cover image** label
+  (`.forms_image_uploader_widget`), whose button reads **Upload image**.
+
+Mind the labels: the attachment *tab* is called "Upload image", and so is the cover
+widget's *button*. A query for a button reading "Upload image" finds the tab and the
+cover, never the attachment uploader.
+
+The **Images** tab offers existing project screenshots with no upload. Do not use it for a
+devlog: a store screenshot says nothing about what changed today.
+
+### Uploading an image: real file bytes only
+
+Neither uploader has an `<input type=file>` in the DOM — the widget creates one on demand
+and calls `.click()` on it, which opens a native OS dialog you cannot drive. Capture that
+input, **move it into the document** so `find` can see it, and fill it with the
+extension's `file_upload` tool, which reads the PNG from disk:
 
 ```js
-window.__cap = [];
 window.__origClick = HTMLInputElement.prototype.click;
+window.__cap = [];
 HTMLInputElement.prototype.click = function () {
   if (this.type === 'file') { window.__cap.push(this); return; }
   return window.__origClick.apply(this, arguments);
 };
-// then click the widget's own button in JS, take window.__cap[0],
-// assign it a DataTransfer built from your shim's files, dispatch 'change'
+// attachment: click the "Upload image" tab_btn, then the "Select images" button
+// cover:      document.querySelector('.forms_image_uploader_widget button').click()
+await new Promise(r => setTimeout(r, 300));
+HTMLInputElement.prototype.click = window.__origClick;       // restore immediately
+const inp = window.__cap[0];
+inp.setAttribute('aria-label', 'claude upload target');
+inp.style.cssText = 'position:fixed;top:0;left:0;width:200px;height:40px;z-index:99999';
+document.body.appendChild(inp);                               // still wired to the widget
 ```
 
-**Restore `HTMLInputElement.prototype.click` and remove the shim before saving**, or the
-Save button's own click does nothing. The `itch-store-page` skill documents this dance
-in full, including the shim markup — read it if the short version above is not enough.
+Then `find` "file input claude upload target" → `file_upload` with that ref and the PNG's
+absolute path. Wait ~6 s, remove the input from `document.body`, and read the id back
+(`input[name$="[object_id]"]` for the attachment, `post[cover_image_id]` for the cover).
+The captured input keeps its change listener after being moved, so the upload proceeds
+exactly as if the dialog had been used. Do the attachment and the cover as two separate
+captures.
 
-Note itch's own warning on that tab: an uploaded image belongs to the post only, and
-does **not** join the project's screenshots.
+**Two lines above are load-bearing in ways that do not look it.** Measured on the devlog
+form, 2026-09-17:
+
+- **Do not guard the `appendChild` on `isConnected`.** The captured input is *already* in
+  the document — itch parents it to `<html>`, so `inp.isConnected` is `true` and an
+  `if (!inp.isConnected)` wrapper, which is the natural thing to write around a move,
+  skips it every time. Being connected is not the problem; being a sibling of `<body>`
+  with a zero rect is, and `find` cannot return what has no box. Move it unconditionally.
+- **Keep `style.cssText = '...'` as a whole-string assignment.** The widget ships the
+  input with an *inline* `style="display: none;"`, and assigning `cssText` replaces the
+  whole inline declaration, which is what clears it. Refactoring that one line into
+  `inp.style.position = 'fixed'` and friends — the obvious tidy-up — leaves the inline
+  `display: none` standing, the element keeps its zero rect, `find` returns nothing, and
+  the failure looks like the capture not working rather than like a styling bug. If you
+  prefer the property form, set `inp.style.display = 'block'` explicitly.
+
+**Never hand-carry image bytes through a JS string.** Pasting a base64 PNG into
+`javascript_tool` and building a `File` from it *looks* like it works: the upload
+succeeds, itch returns an image id, and the byte count can even match — but one wrong
+character in 20 kB of base64 breaks a PNG CRC, and itch stores the corrupt file without
+complaint. Both the body image and the cover then render as broken images on the post.
+The same goes for fetching the file from a local server: a `fetch` from the itch page to
+`http://localhost` hangs on Chrome's local-network permission prompt, which you must not
+accept for the user. `file_upload` from disk is the only route that carries the real
+bytes.
+
+**An image id is not proof.** Verify that each uploaded image *loads*:
+
+```js
+const test = src => new Promise(r => { const i = new Image(); i.onload = () => r(true); i.onerror = () => r(false); i.src = src; });
+const urls = [...new Set(document.body.innerHTML.match(/https:\/\/img\.itch\.zone\/[^"')\s&]+/g) || [])];
+const out = [];
+for (const u of urls) out.push({ id: atob(u.split('/')[3]), ok: await test(u) });   // e.g. img/30042302.png
+out
+```
+
+Return decoded ids and booleans, not raw URLs — the extension redacts image URLs in tool
+output. Any `ok: false` for one of today's ids means the upload is corrupt: remove that
+attachment (its **Remove** button), clear the cover (**Remove image**), and upload again
+from disk.
+
+Note itch's own warning on the tab: an uploaded image belongs to the post only, and does
+**not** join the project's screenshots.
 
 ## Field reference
 
@@ -148,8 +276,8 @@ Form at `itch.io/dashboard/game/<id>/new-devlog`:
 | Cover | `input[name="post[cover_image_id]"]` (hidden; set by the widget) |
 | Attachments | `input[name^="attachment"]` — `[N][object_type]` + `[N][object_id]` |
 | Comments | `input[name="post[enable_comments]"]` |
-| Publish | `input[name="post[published]"]` — **unchecked by default** |
-| Submit | the `button[type=submit]` reading "Save" |
+| Publish | `input[name="post[published]"]` — unchecked on a new post, **but pre-ticked when you reopen a draft to edit it**; read it before every save |
+| Submit | the `form button.button` reading "Save" — it has no `type=submit`, so a `button[type=submit]` query returns nothing |
 
 Write the bullets as a real list in the editor rather than lines starting with `-`;
 the feed renders the markup, not the dashes.
@@ -178,15 +306,21 @@ ta.value = ed.innerHTML;      // the half that is actually submitted
 ta.value.length               // must be non-zero, or Save posts an empty devlog
 ```
 
-**Resolve the element; do not hard-code the class.** The two forms have been observed
-disagreeing — a live read of the store edit form returned `.redactor-in` on 2026-08-17,
-while this devlog form was recorded using `.redactor-layer`. Do not go and settle which
-one is "really" right: the chain above is the answer either way, and the answer expires.
-These class names belong to itch, not to us; a name read today can change on their next
-deploy, and two forms on the same site already disagree, which is the strongest evidence
-you will get that pinning one is the wrong move. So the chain is the design, not a
-workaround waiting on a measurement — whichever class is live it finds it, and the
-`[contenteditable="true"]` fallback catches a third nobody has seen yet.
+**Resolve the element; do not hard-code the class.** The two names were once recorded as
+two forms disagreeing — `.redactor-in` off the store edit form on 2026-08-17,
+`.redactor-layer` off this one. A live read of the devlog form on 2026-09-17 says that was
+never a disagreement: both selectors return the **same element**, whose class list is
+`redactor-layer redactor-styles redactor-layer-img-edit redactor-in`. Two names on one
+node, read on two days, and written down as a conflict.
+
+That correction is not a reason to pin either name — it is the reason the chain stays.
+Had the earlier note been acted on rather than left open, the "losing" selector would have
+been deleted from a form that carries both, for a form nobody re-measured. These class
+names belong to itch, not to us; the class list above is four deep and any of it can move
+on their next deploy. So the chain is the design, not a workaround waiting on a
+measurement — whichever class is live it finds it, and the `[contenteditable="true"]`
+fallback catches a name nobody has seen yet. (The store form has *not* been re-read since
+2026-08-17, so nothing here says what it carries today.)
 
 What that buys you is a **failure you can detect**. Treat a `null` at `ed`, or a
 zero-length `ta.value`, as the bug and stop — those are the two states that produce an
@@ -199,9 +333,13 @@ that has not finished loading.
 - **`Attach` does not touch the body.** It appends hidden `attachment[N]` inputs. So
   verifying by looking for an `<img>` in the editor reports failure on a working
   attach — read `input[name^="attachment"]` instead.
-- **A build may already be attached** as `attachment[1][object_type]=build`. That is
-  itch offering the latest upload; leave it if the user pushed a build today, remove it
-  if they did not, since it implies a release that never happened.
+- **itch pre-attaches things you did not choose.** A fresh form can arrive with the
+  latest file (`object_type=upload`), the latest build (`object_type=build`) and every
+  recently added project screenshot (`object_type=image`) already attached. **Remove all
+  of them** with each row's **Remove** button before adding today's screenshot — a devlog
+  carries no file or build attachments (see Boundaries), and a store screenshot
+  dilutes "one screenshot of what changed". Read `input[name^="attachment"]` after
+  removing: the only attachment left should be the image you uploaded.
 - **Serializing large chunks of this page can wedge the renderer** — an `outerHTML` dump
   or a full-page screenshot has hung the tab outright. Read narrow: specific selectors,
   short slices. The store page's edit form fails next door to this one: screenshots there
@@ -219,6 +357,9 @@ that has not finished loading.
 - **Publishing is the user's call**, every time. Draft, show, wait. Approval yesterday
   is not approval today.
 - **Don't edit or delete existing devlogs** unless asked — they may have comments.
-- **Don't attach builds or flip the project's visibility.** Shipping a build is a
-  separate decision from writing about it; if today's work isn't uploaded, say so
-  rather than implying it is live.
+- **Never attach files or builds to a devlog** — not even ones itch pre-attaches, and not
+  when the user pushed a build today. The game page is where downloads live; a devlog
+  carries text and one screenshot. Remove any `upload`/`build` attachment you find.
+- **Don't flip the project's visibility, and don't deploy to make a post true.** Shipping
+  is a separate decision from writing about it. If today's work isn't deployed, say so and
+  ask — see *Committed is not deployed*, which is how you find out rather than assume.
